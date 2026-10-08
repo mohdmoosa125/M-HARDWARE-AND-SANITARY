@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Products | M Hardware & Sanitary</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body data-page="products">
+
+  <div id="site-nav"></div>
+
+  <main id="app">
+
+    <div class="page-head">
+      <h1>Our Products</h1>
+      <p>Pipes, taps, tiles, sanitary ware, tools, machines and more</p>
+    </div>
+
+    <div class="section">
+      <div class="products-layout">
+
+        <aside id="filters" class="filters">
+          <p class="loading">Loading filters…</p>
+        </aside>
+
+        <div>
+          <div class="toolbar">
+            <form id="searchForm" class="search-box">
+              <input id="searchInput" placeholder="Search products, brands, SKU…">
+              <button class="btn btn-primary" type="submit">Search</button>
+            </form>
+
+            <select id="sortSelect" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+              <option value="newest">Newest first</option>
+              <option value="price_asc">Price: Low → High</option>
+              <option value="price_desc">Price: High → Low</option>
+              <option value="name_asc">Name: A → Z</option>
+            </select>
+          </div>
+
+          <p class="count" id="resultCount" style="color:var(--muted);margin:0 0 14px"></p>
+
+          <div id="productsGrid" class="product-grid">
+            <p class="loading"><span class="spinner"></span>Loading products…</p>
+          </div>
+
+          <div id="pagination" class="pagination"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="js/app.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/categories.js"></script>
+  <script src="js/products.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/contact.js"></script>
+  <script src="js/gallery.js"></script>
+  <script src="js/ai-assistant.js"></script>
+  <script src="js/router.js"></script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inquiries | M Hardware Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    async function init() {
+      const host = await renderAdminShell("inquiries.html");
+      if (!host) return;
+      document.getElementById("pageTitle").textContent = "Inquiries & Messages";
+
+      host.innerHTML = `
+        <div class="card">
+          <h2>Product Inquiries</h2>
+          <div id="inqBox"><p class="loading">Loading…</p></div>
+        </div>
+        <div class="card">
+          <h2>Contact Messages</h2>
+          <div id="msgBox"><p class="loading">Loading…</p></div>
+        </div>`;
+
+      try {
+        const res = await api("/inquiries");
+        const rows = res.data || [];
+        document.getElementById("inqBox").innerHTML = rows.length ? `
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Phone</th><th>Product</th><th>Qty</th>
+                       <th>Message</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              ${rows.map((i) => `
+                <tr>
+                  <td>${esc(i.name)}</td>
+                  <td>${esc(i.phone || "—")}</td>
+                  <td>${esc(i.product_name || "—")}</td>
+                  <td>${esc(i.quantity || "—")}</td>
+                  <td style="max-width:260px">${esc(i.message || "—")}</td>
+                  <td>
+                    <select onchange="setInquiryStatus(${i.id}, this.value)"
+                      style="padding:5px;border-radius:6px;border:1px solid #e5e7eb">
+                      ${["new","contacted","closed"].map((s) =>
+                        `<option value="${s}" ${i.status === s ? "selected" : ""}>${s}</option>`
+                      ).join("")}
+                    </select>
+                  </td>
+                  <td><button class="btn btn-sm btn-danger" onclick="delInquiry(${i.id})">✕</button></td>
+                </tr>`).join("")}
+            </tbody>
+          </table></div>` : `<p class="empty">No inquiries yet.</p>`;
+      } catch (err) {
+        document.getElementById("inqBox").innerHTML = `<p class="empty">${esc(err.message)}</p>`;
+      }
+
+      try {
+        const res = await api("/contact");
+        const rows = res.data || [];
+        document.getElementById("msgBox").innerHTML = rows.length ? `
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Message</th><th></th></tr></thead>
+            <tbody>
+              ${rows.map((m) => `
+                <tr>
+                  <td>${esc(m.name)}</td>
+                  <td>${esc(m.phone || "—")}</td>
+                  <td>${esc(m.email || "—")}</td>
+                  <td style="max-width:340px">${esc(m.message)}</td>
+                  <td><button class="btn btn-sm btn-danger" onclick="delMessage(${m.id})">✕</button></td>
+                </tr>`).join("")}
+            </tbody>
+          </table></div>` : `<p class="empty">No messages yet.</p>`;
+      } catch (err) {
+        document.getElementById("msgBox").innerHTML = `<p class="empty">${esc(err.message)}</p>`;
+      }
+    }
+
+    async function setInquiryStatus(id, status) {
+      try {
+        await api("/inquiries/" + id, { method: "PUT", body: JSON.stringify({ status }) });
+      } catch (err) { alert(err.message); }
+    }
+    async function delInquiry(id) {
+      if (!confirm("Delete this inquiry?")) return;
+      await api("/inquiries/" + id, { method: "DELETE" });
+      init();
+    }
+    async function delMessage(id) {
+      if (!confirm("Delete this message?")) return;
+      await api("/contact/" + id, { method: "DELETE" });
+      init();
+    }
+
+    init();
+  </script>
+</body>
+</html>

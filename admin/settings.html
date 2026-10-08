@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings | M Hardware Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    const FIELDS = [
+      ["business_name", "Business Name"],
+      ["tagline", "Tagline"],
+      ["phone", "Phone Number"],
+      ["whatsapp", "WhatsApp Number (digits only, with country code)"],
+      ["email", "Email"],
+      ["address", "Address"],
+      ["opening_hours", "Opening Hours"],
+      ["google_maps", "Google Maps Link"],
+      ["facebook", "Facebook URL"],
+      ["instagram", "Instagram URL"],
+      ["youtube", "YouTube URL"],
+      ["twitter", "Twitter / X URL"],
+      ["footer_text", "Footer Text"],
+      ["developer_name", "Developer Name"],
+    ];
+
+    async function init() {
+      const host = await renderAdminShell("settings.html");
+      if (!host) return;
+      document.getElementById("pageTitle").textContent = "Settings";
+
+      let current = {};
+      try {
+        const res = await api("/settings");
+        current = res.data || {};
+      } catch {}
+
+      host.innerHTML = `
+        <div class="card">
+          <h2>Business Settings</h2>
+          <p style="color:#6b7280;font-size:.9rem">
+            These values are used everywhere on the website — navbar, footer,
+            WhatsApp buttons and contact page. No HTML editing required.
+          </p>
+          <div id="setAlert"></div>
+
+          <form id="setForm">
+            ${FIELDS.map(([key, label]) => `
+              <div class="form-group">
+                <label>${label}</label>
+                <input name="${key}" value="${esc(current[key] || "")}">
+              </div>`).join("")}
+
+            <button class="btn btn-primary" type="submit">💾 Save Settings</button>
+          </form>
+        </div>`;
+
+      document.getElementById("setForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const box = document.getElementById("setAlert");
+        const payload = Object.fromEntries(new FormData(e.target).entries());
+        try {
+          await api("/settings", { method: "PUT", body: JSON.stringify(payload) });
+          box.innerHTML = `<div class="alert alert-success">Settings saved.</div>`;
+          window.__settings = payload;
+        } catch (err) {
+          box.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

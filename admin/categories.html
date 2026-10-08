@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Categories | M Hardware Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    let tree = [];
+
+    async function init() {
+      const host = await renderAdminShell("categories.html");
+      if (!host) return;
+      document.getElementById("pageTitle").textContent = "Categories";
+
+      host.innerHTML = `
+        <div class="card">
+          <h2>Add Category</h2>
+          <div id="catAlert"></div>
+          <form id="catForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Name *</label>
+                <input name="name" required placeholder="e.g. Sanitary">
+              </div>
+              <div class="form-group">
+                <label>Parent Category (for subcategory)</label>
+                <select name="parent_id" id="parentSelect">
+                  <option value="">— Top level category —</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input name="description">
+            </div>
+            <div class="form-group">
+              <label>Image URL (optional, upload via Gallery page if needed)</label>
+              <input name="image" placeholder="/uploads/categories/...">
+            </div>
+            <button class="btn btn-primary" type="submit">➕ Add Category</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>All Categories</h2>
+          <div id="catTree"><p class="loading">Loading…</p></div>
+        </div>`;
+
+      document.getElementById("catForm").addEventListener("submit", addCategory);
+      await loadTree();
+    }
+
+    async function loadTree() {
+      try {
+        const res = await api("/categories?tree=1");
+        tree = res.data || [];
+        renderTree();
+        fillParentSelect();
+      } catch (err) {
+        document.getElementById("catTree").innerHTML =
+          `<p class="empty">${esc(err.message)}</p>`;
+      }
+    }
+
+    function fillParentSelect() {
+      const sel = document.getElementById("parentSelect");
+      sel.innerHTML = `<option value="">— Top level category —</option>` +
+        tree.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+    }
+
+    function renderTree() {
+      const host = document.getElementById("catTree");
+      if (!tree.length) {
+        host.innerHTML = `<p class="empty">No categories yet. Add one above.</p>`;
+        return;
+      }
+
+      host.innerHTML = tree.map((cat) => `
+        <div style="border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <div>
+              <b>${esc(cat.name)}</b>
+              <small style="color:#6b7280"> &nbsp;/${esc(cat.slug)}</small>
+              <span class="badge badge-grey">${cat.product_count || 0} products</span>
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id})">Delete</button>
+          </div>
+
+          ${cat.children && cat.children.length ? `
+            <div style="margin-top:10px;padding-left:16px;border-left:2px solid #e5e7eb">
+              ${cat.children.map((sub) => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
+                  <span>↳ ${esc(sub.name)}</span>
+                  <button class="btn btn-sm btn-danger" onclick="deleteCategory(${sub.id})">Delete</button>
+                </div>`).join("")}
+            </div>` : ""}
+        </div>`).join("");
+    }
+
+    async function addCategory(e) {
+      e.preventDefault();
+      const form = e.target;
+      const box = document.getElementById("catAlert");
+      const payload = {
+        name: form.name.value.trim(),
+        parent_id: form.parent_id.value || null,
+        description: form.description.value,
+        image: form.image.value,
+      };
+
+      try {
+        await api("/categories", { method: "POST", body: JSON.stringify(payload) });
+        box.innerHTML = `<div class="alert alert-success">Category added.</div>`;
+        form.reset();
+        await loadTree();
+      } catch (err) {
+        box.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+      }
+    }
+
+    async function deleteCategory(id) {
+      if (!confirm("Delete this category? Products will be un-categorised, not deleted.")) return;
+      try {
+        await api("/categories/" + id, { method: "DELETE" });
+        await loadTree();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

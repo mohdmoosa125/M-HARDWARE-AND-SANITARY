@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery | M Hardware Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    let uploadedUrl = "";
+
+    async function init() {
+      const host = await renderAdminShell("gallery.html");
+      if (!host) return;
+      document.getElementById("pageTitle").textContent = "Gallery";
+
+      host.innerHTML = `
+        <div class="card">
+          <h2>Add Image</h2>
+          <div id="galAlert"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Title</label>
+              <input id="gTitle" placeholder="e.g. Showroom front">
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select id="gCategory">
+                ${["Shop","Sanitary","Tiles","Hardware","Machines","Products","Projects"]
+                  .map((c) => `<option>${c}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Image file</label>
+            <input type="file" id="gFile" accept="image/*">
+            <div id="gPreview" style="margin-top:10px"></div>
+          </div>
+          <button class="btn btn-primary" id="gAdd">➕ Add to Gallery</button>
+        </div>
+
+        <div class="card">
+          <h2>Gallery Images</h2>
+          <div id="galGrid"><p class="loading">Loading…</p></div>
+        </div>`;
+
+      document.getElementById("gFile").addEventListener("change", uploadImage);
+      document.getElementById("gAdd").addEventListener("click", addToGallery);
+      await loadGallery();
+    }
+
+    async function uploadImage(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload/gallery", {
+        method: "POST", body: fd, credentials: "same-origin",
+      });
+      const data = await res.json();
+      if (data.success) {
+        uploadedUrl = data.data.url;
+        document.getElementById("gPreview").innerHTML =
+          `<img src="${uploadedUrl}" style="max-width:200px;border-radius:10px">`;
+      } else {
+        alert(data.message);
+      }
+    }
+
+    async function addToGallery() {
+      const box = document.getElementById("galAlert");
+      if (!uploadedUrl) {
+        box.innerHTML = `<div class="alert alert-error">Please choose an image first.</div>`;
+        return;
+      }
+      try {
+        await api("/gallery", {
+          method: "POST",
+          body: JSON.stringify({
+            title: document.getElementById("gTitle").value,
+            category: document.getElementById("gCategory").value,
+            image: uploadedUrl,
+          }),
+        });
+        box.innerHTML = `<div class="alert alert-success">Image added.</div>`;
+        uploadedUrl = "";
+        document.getElementById("gPreview").innerHTML = "";
+        document.getElementById("gTitle").value = "";
+        await loadGallery();
+      } catch (err) {
+        box.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+      }
+    }
+
+    async function loadGallery() {
+      const host = document.getElementById("galGrid");
+      try {
+        const res = await api("/gallery");
+        const items = res.data || [];
+        host.innerHTML = items.length ? `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+            ${items.map((g) => `
+              <div style="position:relative">
+                <img src="${esc(g.image)}" style="width:100%;height:130px;object-fit:cover;border-radius:10px">
+                <div style="font-size:.8rem;margin-top:4px">${esc(g.title || "")}
+                  <span class="badge badge-grey">${esc(g.category)}</span></div>
+                <button class="btn btn-sm btn-danger" style="position:absolute;top:6px;right:6px"
+                  onclick="delImage(${g.id})">✕</button>
+              </div>`).join("")}
+          </div>` : `<p class="empty">No gallery images yet.</p>`;
+      } catch (err) {
+        host.innerHTML = `<p class="empty">${esc(err.message)}</p>`;
+      }
+    }
+
+    async function delImage(id) {
+      if (!confirm("Delete this image?")) return;
+      await api("/gallery/" + id, { method: "DELETE" });
+      await loadGallery();
+    }
+
+    init();
+  </script>
+</body>
+</html>

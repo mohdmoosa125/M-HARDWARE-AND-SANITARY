@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Products | M Hardware Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    let allProducts = [];
+    let imageInfo = {};
+    const qs = new URLSearchParams(location.search);
+    const statusFilter = qs.get('missing_images') === '1' ? ['missing', 'failed']
+      : (qs.get('image_status') ? qs.get('image_status').split(',') : null);
+
+    async function init() {
+      const host = await renderAdminShell("products.html");
+      if (!host) return;
+      document.getElementById("pageTitle").textContent = "Products";
+
+      host.innerHTML = `
+        <div class="toolbar">
+          <input id="searchBox" placeholder="Search products…" style="flex:1;min-width:200px">
+          <button class="btn btn-outline" id="genBtn">🖼 Generate Missing Images</button>
+          <span id="genStatus" style="font-size:13px;color:#6b7280"></span>
+          <a class="btn btn-primary" href="product-form.html">➕ Add Product</a>
+        </div>
+        <div class="card">
+          <div id="productTable"><p class="loading">Loading products…</p></div>
+        </div>`;
+
+      document.getElementById("searchBox").addEventListener("input", (e) => {
+        renderTable(e.target.value.toLowerCase());
+      });
+
+      document.getElementById("genBtn").addEventListener("click", (e) =>
+        generateMissingImages(e.target, document.getElementById("genStatus"), loadProducts));
+
+      await loadProducts();
+    }
+
+    async function loadProducts() {
+      try {
+        // fetch every page (API caps limit at 100)
+        allProducts = [];
+        let page = 1, pages = 1;
+        do {
+          const res = await api("/products?limit=100&page=" + page);
+          allProducts = allProducts.concat(res.data || []);
+          pages = (res.meta && res.meta.pages) || 1;
+        } while (++page <= pages);
+        try { imageInfo = (await api("/admin/images/report")).data.products; } catch { imageInfo = {}; }
+        renderTable("");
+      } catch (err) {
+        document.getElementById("productTable").innerHTML =
+          `<p class="empty">Could not load products: ${esc(err.message)}</p>`;
+      }
+    }
+
+    function renderTable(filter) {
+      const host = document.getElementById("productTable");
+      const base = statusFilter
+        ? allProducts.filter((p) => statusFilter.includes((imageInfo[p.id] || {}).status))
+        : allProducts;
+      const items = filter
+        ? base.filter((p) =>
+            (p.name + " " + (p.brand || "") + " " + (p.sku || "")).toLowerCase().includes(filter))
+        : base;
+
+      if (!items.length) {
+        host.innerHTML = `<p class="empty">No products found.</p>`;
+        return;
+      }
+
+      host.innerHTML = `
+        <div class="table-wrap"><table>
+          <thead>
+            <tr>
+              <th>Image</th><th>Image status</th><th>Name</th><th>Category</th>
+              <th>Price</th><th>Stock</th><th>Featured</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((p) => `
+              <tr>
+                <td>${p.image ? `<img class="thumb" src="${esc(p.image)}">` : "—"}</td>
+                <td>${imageBadge(imageInfo[p.id])}</td>
+                <td><b>${esc(p.name)}</b><br><small style="color:#6b7280">${esc(p.brand || "")}</small></td>
+                <td>${esc(p.category_name || "—")}</td>
+                <td>${money(p.final_price)}</td>
+                <td>${p.stock <= 3
+                  ? `<span class="badge badge-red">${p.stock}</span>`
+                  : `<span class="badge badge-green">${p.stock}</span>`}</td>
+                <td>${p.featured ? "⭐" : "—"}</td>
+                <td class="row-actions">
+                  <a class="btn btn-sm btn-outline" href="product-form.html?id=${p.id}">Edit</a>
+                  ${(imageInfo[p.id] || {}).status === "ready" ? "" :
+                    `<button class="btn btn-sm btn-outline" onclick="regen(${p.id}, this)">🔄 Image</button>`}
+                  <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">Delete</button>
+                </td>
+              </tr>`).join("")}
+          </tbody>
+        </table></div>`;
+    }
+
+    function regen(id, btn) {
+      regenerateImage(id, btn, () => loadProducts());
+    }
+
+    async function deleteProduct(id) {
+      if (!confirm("Delete this product permanently?")) return;
+      try {
+        await api("/products/" + id, { method: "DELETE" });
+        allProducts = allProducts.filter((p) => p.id !== id);
+        renderTable(document.getElementById("searchBox").value.toLowerCase());
+      } catch (err) {
+        alert("Could not delete: " + err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
