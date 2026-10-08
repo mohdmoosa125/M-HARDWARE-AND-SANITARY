@@ -7,7 +7,9 @@ from models.user import User
 from models.category import Category
 from models.product import Product
 from models.customer import Customer
-from models.order import Order, OrderItem
+from models.order import Order, OrderItem, OrderStatusHistory
+from models.invoice import Invoice
+from models.account import Address, WishlistItem
 from models.inquiry import Inquiry, ContactMessage
 from models.settings import Setting
 from models.gallery import GalleryImage
@@ -15,6 +17,7 @@ from models.ai import AIConversation, AIMessage
 
 __all__ = [
     "User", "Category", "Product", "Customer",
-    "Order", "OrderItem", "Inquiry", "ContactMessage",
+    "Order", "OrderItem", "OrderStatusHistory", "Invoice", "Address", "WishlistItem",
+    "Inquiry", "ContactMessage",
     "Setting", "GalleryImage", "AIConversation", "AIMessage",
 ]

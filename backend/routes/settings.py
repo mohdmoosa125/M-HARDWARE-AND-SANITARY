@@ -1,50 +1,43 @@
 """
 Settings
 --------
-Public GET returns only the "safe" keys (phone, address, etc).
-PUT is admin-only and can change anything.
+Public GET returns the business configuration (never private keys).
+PUT is admin-only. Defaults live in services/store_config.py.
 """
 from flask import Blueprint, request
 from models import Setting
-from utils import ok, admin_required
+from services.store_config import DEFAULTS, PRIVATE_KEYS, public_settings, all_settings  # noqa: F401
+from utils import ok, fail, admin_required
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/api/settings")
 
-# Default values used the first time the site runs
-DEFAULTS = {
-    "business_name": "M Hardware & Sanitary",
-    "tagline": "Quality Hardware, Sanitary & Construction Products",
-    "phone": "+919876543210",
-    "whatsapp": "919876543210",
-    "email": "info@mhardware.com",
-    "address": "Main Road, Bhopal, Madhya Pradesh",
-    "opening_hours": "Mon – Sat: 9:00 AM – 8:00 PM",
-    "google_maps": "",
-    "facebook": "#",
-    "instagram": "#",
-    "youtube": "#",
-    "twitter": "#",
-    "footer_text": "M Hardware & Sanitary is a trusted store providing quality hardware and sanitary products for homes and businesses.",
-    "developer_name": "Moosa",
-    "logo": "",
-}
-
 
 @settings_bp.get("")
-def public_settings():
+def get_public_settings():
     """Return merged defaults + database values."""
-    stored = Setting.all_as_dict()
-    merged = {**DEFAULTS, **stored}
-    # never expose internal keys publicly (none currently, but keep the habit)
-    merged.pop("ai_api_key", None)
-    return ok(merged)
+    return ok(public_settings())
+
+
+@settings_bp.get("/admin")
+@admin_required
+def get_admin_settings():
+    return ok(all_settings())
 
 
 @settings_bp.put("")
 @admin_required
 def update_settings():
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return fail("Invalid settings payload")
     for key, value in data.items():
+        key = str(key).strip()
+        if not key or len(key) > 80:
+            continue
+        if isinstance(value, bool):
+            value = "1" if value else "0"
+        value = "" if value is None else str(value)
+        if len(value) > 5000:
+            return fail(f"Value for {key} is too long")
         Setting.set(key, value)
-    stored = Setting.all_as_dict()
-    return ok({**DEFAULTS, **stored}, message="Settings saved")
+    return ok(all_settings(), message="Settings saved")

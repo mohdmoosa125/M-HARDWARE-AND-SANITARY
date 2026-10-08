@@ -18,19 +18,23 @@ def build_product_query(args):
     query = Product.query
 
     # ---- search box ----
-    q = args.get("q")
+    q = (args.get("q") or "").strip()[:100]
     if q:
-        like = f"%{q}%"
-        query = query.outerjoin(Category).filter(
-            or_(
-                Product.name.ilike(like),
-                Product.brand.ilike(like),
-                Product.sku.ilike(like),
-                Product.description.ilike(like),
-                Product.short_description.ilike(like),
-                Category.name.ilike(like),
+        # every word must match somewhere (name, brand, SKU, text, material or category)
+        query = query.outerjoin(Category)
+        for word in q.split()[:6]:
+            like = f"%{word}%"
+            query = query.filter(
+                or_(
+                    Product.name.ilike(like),
+                    Product.brand.ilike(like),
+                    Product.sku.ilike(like),
+                    Product.description.ilike(like),
+                    Product.short_description.ilike(like),
+                    Product.material.ilike(like),
+                    Category.name.ilike(like),
+                )
             )
-        )
 
     # ---- category (slug or id) ----
     category = args.get("category")
@@ -55,7 +59,8 @@ def build_product_query(args):
 
     # ---- simple equals filters ----
     if args.get("brand"):
-        query = query.filter(Product.brand == args["brand"])
+        brands = [b for b in args["brand"].split(",") if b]
+        query = query.filter(Product.brand.in_(brands))
     if args.get("color"):
         query = query.filter(Product.color == args["color"])
     if args.get("material"):
@@ -63,17 +68,23 @@ def build_product_query(args):
     if args.get("size"):
         query = query.filter(Product.size == args["size"])
 
-    # ---- price range ----
-    if args.get("min_price"):
-        query = query.filter(Product.price >= float(args["min_price"]))
-    if args.get("max_price"):
-        query = query.filter(Product.price <= float(args["max_price"]))
+    # ---- price range (on the price the customer actually pays) ----
+    final_price = func.coalesce(Product.discount_price, Product.price)
+    min_price, max_price = _as_float(args.get("min_price")), _as_float(args.get("max_price"))
+    if min_price is not None:
+        query = query.filter(final_price >= min_price)
+    if max_price is not None:
+        query = query.filter(final_price <= max_price)
 
     # ---- availability / featured ----
     if args.get("availability") in ("1", "true", "in"):
-        query = query.filter(Product.availability.is_(True))
+        query = query.filter(Product.availability.is_(True), Product.stock > 0)
     if args.get("featured") in ("1", "true"):
         query = query.filter(Product.featured.is_(True))
+
+    # ---- admin: image status ----
+    if args.get("image_status"):
+        query = query.filter(Product.image_status.in_(args["image_status"].split(",")))
 
     # ---- discounted only ----
     if args.get("discount") in ("1", "true"):
@@ -83,9 +94,11 @@ def build_product_query(args):
     # ---- sorting ----
     sort = args.get("sort", "newest")
     if sort == "price_asc":
-        query = query.order_by(Product.price.asc())
+        query = query.order_by(final_price.asc())
     elif sort == "price_desc":
-        query = query.order_by(Product.price.desc())
+        query = query.order_by(final_price.desc())
+    elif sort == "featured":
+        query = query.order_by(Product.featured.desc(), Product.created_at.desc())
     elif sort == "discount":
         query = query.order_by(
             ((Product.price - func.coalesce(Product.discount_price, Product.price)) / Product.price).desc()
@@ -105,10 +118,17 @@ def _as_int(value):
         return -1
 
 
+def _as_float(value):
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
 def paginate(query, page=1, limit=20):
     """Return (items, meta) with page clamping."""
-    page = max(1, int(page or 1))
-    limit = min(100, max(1, int(limit or 20)))
+    page = max(1, _as_int(page) if _as_int(page) > 0 else 1)
+    limit = min(100, max(1, _as_int(limit) if _as_int(limit) > 0 else 20))
     total = query.count()
     items = query.offset((page - 1) * limit).limit(limit).all()
     pages = (total + limit - 1) // limit

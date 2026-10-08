@@ -44,6 +44,7 @@ class Product(db.Model):
 
     availability = db.Column(db.Boolean, default=True)
     featured = db.Column(db.Boolean, default=False)
+    min_stock = db.Column(db.Integer, default=5)        # low-stock warning level
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -60,6 +61,22 @@ class Product(db.Model):
             return json.loads(self.additional_images)
         except Exception:
             return []
+
+    @property
+    def in_stock(self):
+        return bool(self.availability) and (self.stock or 0) > 0
+
+    @property
+    def stock_status(self):
+        if not self.in_stock:
+            return "out"
+        return "low" if (self.stock or 0) <= (self.min_stock if self.min_stock is not None else 5) else "in"
+
+    @property
+    def discount_percent(self):
+        if self.discount_price and self.price and self.discount_price < self.price:
+            return int(round((self.price - self.discount_price) * 100 / self.price))
+        return 0
 
     def to_dict(self):
         return {
@@ -90,6 +107,10 @@ class Product(db.Model):
             "pieces_per_box": self.pieces_per_box,
             "coverage": self.coverage,
             "availability": self.availability,
+            "in_stock": self.in_stock,
+            "stock_status": self.stock_status,
+            "min_stock": self.min_stock if self.min_stock is not None else 5,
+            "discount_percent": self.discount_percent,
             "featured": self.featured,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

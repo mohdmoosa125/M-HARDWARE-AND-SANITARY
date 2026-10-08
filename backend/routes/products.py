@@ -1,7 +1,7 @@
 """Product CRUD, search, filters, related products."""
 from flask import Blueprint, request, current_app
 from database.db import db
-from models import Product, Category, Setting
+from models import Product, Category, Setting, OrderItem, WishlistItem
 from services import image_service
 from services.product_service import build_product_query, paginate
 from utils import ok, fail, slugify, admin_required
@@ -70,18 +70,54 @@ def get_product(pid):
     return ok(product.to_dict())
 
 
+@products_bp.get("/slug/<slug>")
+def get_product_by_slug(slug):
+    product = Product.query.filter_by(slug=slug).first()
+    if not product:
+        return fail("Product not found", 404)
+    return ok(product.to_dict())
+
+
+@products_bp.get("/compare")
+def compare_products():
+    """?ids=1,2,3 (max 4) — same order as requested."""
+    ids = [int(x) for x in (request.args.get("ids") or "").split(",") if x.strip().isdigit()][:4]
+    if len(ids) < 2:
+        return fail("Choose at least two products to compare")
+    found = {p.id: p for p in Product.query.filter(Product.id.in_(ids)).all()}
+    return ok([found[i].to_dict() for i in ids if i in found])
+
+
 @products_bp.get("/<int:pid>/related")
 def related_products(pid):
+    """Same category first, then sibling subcategories, then same brand; nearest price wins."""
     product = db.session.get(Product, pid)
     if not product:
         return fail("Product not found", 404)
+    limit = min(12, max(1, request.args.get("limit", 8, type=int)))
+    price = product.final_price or 0
 
-    q = Product.query.filter(Product.id != pid)
-    if product.category_id:
-        q = q.filter(Product.category_id == product.category_id)
-    elif product.brand:
-        q = q.filter(Product.brand == product.brand)
-    return ok([p.to_dict() for p in q.limit(4).all()])
+    def nearest(q, n):
+        rows = q.filter(Product.id != pid).limit(60).all()
+        return sorted(rows, key=lambda p: (not p.in_stock, abs((p.final_price or 0) - price)))[:n]
+
+    picked = []
+    cat = product.category
+    pools = []
+    if cat:
+        pools.append(Product.query.filter(Product.category_id == cat.id))
+        family = cat.parent or cat
+        ids = [family.id] + [c.id for c in family.children]
+        pools.append(Product.query.filter(Product.category_id.in_(ids)))
+    if product.brand:
+        pools.append(Product.query.filter(Product.brand == product.brand))
+    for q in pools:
+        for p in nearest(q, limit):
+            if p not in picked:
+                picked.append(p)
+        if len(picked) >= limit:
+            break
+    return ok([p.to_dict() for p in picked[:limit]])
 
 
 # ---------------- ADMIN ----------------
@@ -99,12 +135,20 @@ def _apply_product_fields(product, data):
 
     if "price" in data:
         product.price = float(data["price"] or 0)
+        if product.price < 0:
+            raise ValueError("Price cannot be negative")
     if "discount_price" in data:
         product.discount_price = (
-            float(data["discount_price"]) if data["discount_price"] not in (None, "", 0) else None
+            float(data["discount_price"]) if data["discount_price"] not in (None, "", 0, "0") else None
         )
+    if product.discount_price is not None and not (0 < product.discount_price < (product.price or 0)):
+        raise ValueError("Discount price must be more than 0 and lower than the price")
     if "stock" in data:
         product.stock = int(data["stock"] or 0)
+        if product.stock < 0:
+            raise ValueError("Stock cannot be negative")
+    if "min_stock" in data:
+        product.min_stock = max(0, int(data["min_stock"] or 0))
     if "pieces_per_box" in data:
         product.pieces_per_box = (
             int(data["pieces_per_box"]) if data["pieces_per_box"] not in (None, "") else None
@@ -130,8 +174,11 @@ def create_product():
     if not name:
         return fail("Product name is required")
 
-    product = Product(name=name, slug=_unique_slug(name))
-    _apply_product_fields(product, data)
+    product = Product(name=name, slug=_unique_slug(data.get("slug") or name))
+    try:
+        _apply_product_fields(product, data)
+    except (TypeError, ValueError) as e:
+        return fail(_field_error(e))
 
     db.session.add(product)
     db.session.flush()
@@ -149,11 +196,18 @@ def update_product(pid):
 
     data = request.get_json(silent=True) or {}
     old_image = product.image
-    if "name" in data and data["name"].strip():
-        product.name = data["name"].strip()
+    if "name" in data and str(data["name"]).strip():
+        product.name = str(data["name"]).strip()
+    if str(data.get("slug") or "").strip():
+        product.slug = _unique_slug(data["slug"], ignore_id=pid)
+    elif "name" in data:
         product.slug = _unique_slug(product.name, ignore_id=pid)
 
-    _apply_product_fields(product, data)
+    try:
+        _apply_product_fields(product, data)
+    except (TypeError, ValueError) as e:
+        db.session.rollback()
+        return fail(_field_error(e))
     if product.image != old_image:                 # manual upload always overrides generated images
         image_service.mark_manual_image(product)
 
@@ -167,6 +221,68 @@ def delete_product(pid):
     product = db.session.get(Product, pid)
     if not product:
         return fail("Product not found", 404)
-    db.session.delete(product)
+    _delete(product)
     db.session.commit()
     return ok(message="Product deleted")
+
+
+def _field_error(e):
+    msg = str(e)
+    return msg if msg and not msg.startswith(("could not convert", "invalid literal")) \
+        else "Please enter valid numbers for price, stock and quantities"
+
+
+def _delete(product):
+    """Order lines keep their name/price snapshot; only the link is cleared."""
+    OrderItem.query.filter_by(product_id=product.id).update({"product_id": None})
+    WishlistItem.query.filter_by(product_id=product.id).delete()
+    db.session.delete(product)
+
+
+@products_bp.post("/<int:pid>/duplicate")
+@admin_required
+def duplicate_product(pid):
+    src = db.session.get(Product, pid)
+    if not src:
+        return fail("Product not found", 404)
+    skip = {"id", "slug", "sku", "created_at", "updated_at", "image_updated_at"}
+    copy = Product(**{c.name: getattr(src, c.name) for c in Product.__table__.columns if c.name not in skip})
+    copy.name = f"{src.name} (Copy)"
+    copy.slug = _unique_slug(copy.name)
+    copy.featured = False
+    db.session.add(copy)
+    db.session.commit()
+    return ok(copy.to_dict(), message="Product duplicated")
+
+
+BULK_FIELDS = {"category_id", "brand", "availability", "featured", "unit", "min_stock"}
+
+
+@products_bp.post("/bulk")
+@admin_required
+def bulk_products():
+    """{ids: [...], action: "delete" | "update", fields: {...}}"""
+    data = request.get_json(silent=True) or {}
+    ids = [int(i) for i in (data.get("ids") or []) if str(i).isdigit()][:500]
+    if not ids:
+        return fail("Select at least one product")
+    products = Product.query.filter(Product.id.in_(ids)).all()
+    action = data.get("action")
+    if action == "delete":
+        for p in products:
+            _delete(p)
+        db.session.commit()
+        return ok({"count": len(products)}, message=f"{len(products)} product(s) deleted")
+    if action == "update":
+        fields = {k: v for k, v in (data.get("fields") or {}).items() if k in BULK_FIELDS}
+        if not fields:
+            return fail("Nothing to update")
+        try:
+            for p in products:
+                _apply_product_fields(p, fields)
+        except (TypeError, ValueError) as e:
+            db.session.rollback()
+            return fail(_field_error(e))
+        db.session.commit()
+        return ok({"count": len(products)}, message=f"{len(products)} product(s) updated")
+    return fail("Unknown bulk action")

@@ -12,7 +12,7 @@ ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
 @ai_bp.post("/chat")
 def chat():
     data = request.get_json(silent=True) or {}
-    message = (data.get("message") or "").strip()
+    message = (data.get("message") or "").strip()[:500]
     if not message:
         return fail("Message is required")
 
@@ -32,7 +32,8 @@ def chat():
     db.session.add(AIMessage(conversation_id=conversation.id, role="user", content=message))
 
     # build the answer from the database
-    result = generate_reply(message)
+    context = data.get("context") if isinstance(data.get("context"), dict) else {}
+    result = generate_reply(message, context)
 
     db.session.add(AIMessage(
         conversation_id=conversation.id,
@@ -41,8 +42,5 @@ def chat():
     ))
     db.session.commit()
 
-    return ok({
-        "reply": result["reply"],
-        "products": result["products"],
-        "session_key": key,
-    })
+    result["session_key"] = key
+    return ok(result)

@@ -7,6 +7,7 @@ Small helper functions used all over the project:
   * admin_required -> route protection decorator
 """
 import re
+import time
 import functools
 import unicodedata
 from flask import session, jsonify
@@ -40,3 +41,63 @@ def admin_required(fn):
             return fail("Admin authentication required", 401)
         return fn(*args, **kwargs)
     return wrapper
+
+
+def is_admin():
+    return bool(session.get("admin_id"))
+
+
+def current_customer():
+    """The logged-in, active customer account (or None)."""
+    cid = session.get("customer_id")
+    if not cid:
+        return None
+    from database.db import db
+    from models import Customer
+    customer = db.session.get(Customer, cid)
+    if not customer or customer.is_active is False or not customer.is_registered:
+        session.pop("customer_id", None)
+        return None
+    return customer
+
+
+def customer_required(fn):
+    """Protect a route so only a logged-in customer can use it. Passes `customer`."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        customer = current_customer()
+        if not customer:
+            return fail("Please log in to continue", 401)
+        return fn(customer, *args, **kwargs)
+    return wrapper
+
+
+_FAILS = {}
+
+
+def too_many_attempts(key, limit=5, window=900):
+    """Simple in-memory brute-force guard (per process). True = block."""
+    now = time.time()
+    hits = [t for t in _FAILS.get(key, []) if now - t < window]
+    _FAILS[key] = hits
+    return len(hits) >= limit
+
+
+def record_failure(key):
+    _FAILS.setdefault(key, []).append(time.time())
+
+
+def clear_failures(key):
+    _FAILS.pop(key, None)
+
+
+def to_int(value, default=None):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def clean(value, max_len=255):
+    """Trimmed string, capped in length ('' for None)."""
+    return ("" if value is None else str(value)).strip()[:max_len]

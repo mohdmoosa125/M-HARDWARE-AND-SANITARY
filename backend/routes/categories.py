@@ -2,7 +2,7 @@
 from flask import Blueprint, request
 from database.db import db
 from models import Category, Product
-from utils import ok, fail, slugify, admin_required
+from utils import ok, fail, slugify, admin_required, to_int
 
 categories_bp = Blueprint("categories", __name__, url_prefix="/api/categories")
 
@@ -79,8 +79,9 @@ def create_category():
         description=data.get("description"),
         image=data.get("image"),
         parent_id=data.get("parent_id") or None,
-        sort_order=int(data.get("sort_order") or 0),
+        sort_order=to_int(data.get("sort_order"), 0),
         is_active=bool(data.get("is_active", True)),
+        featured=bool(data.get("featured", False)),
     )
     db.session.add(cat)
     db.session.commit()
@@ -104,12 +105,14 @@ def update_category(cid):
         cat.image = data["image"]
     if "parent_id" in data:
         # prevent a category from becoming its own parent
-        pid = data["parent_id"]
-        cat.parent_id = None if (not pid or int(pid) == cid) else int(pid)
+        pid = to_int(data["parent_id"])
+        cat.parent_id = None if (not pid or pid == cid) else pid
     if "sort_order" in data:
-        cat.sort_order = int(data["sort_order"] or 0)
+        cat.sort_order = to_int(data["sort_order"], 0)
     if "is_active" in data:
         cat.is_active = bool(data["is_active"])
+    if "featured" in data:
+        cat.featured = bool(data["featured"])
 
     db.session.commit()
     return ok(cat.to_dict(), message="Category updated")
@@ -129,3 +132,19 @@ def delete_category(cid):
     db.session.delete(cat)
     db.session.commit()
     return ok(message="Category deleted")
+
+
+@categories_bp.post("/<int:cid>/generate-image")
+@admin_required
+def generate_category_image(cid):
+    """AI image via the configured providers; otherwise reuse the best real product photo."""
+    from services.category_image import generate
+    cat = db.session.get(Category, cid)
+    if not cat:
+        return fail("Category not found", 404)
+    path, source, error = generate(cat)
+    if not path:
+        return fail(error or "Could not create a category image", 422)
+    cat.image = path
+    db.session.commit()
+    return ok(cat.to_dict(), message=f"Category image updated ({source})")

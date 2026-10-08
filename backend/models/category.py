@@ -22,6 +22,7 @@ class Category(db.Model):
     parent_id = db.Column(db.Integer, db.ForeignKey("categories.id"), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     sort_order = db.Column(db.Integer, default=0)
+    featured = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Self-referencing relationship: children <-> parent
@@ -44,10 +45,12 @@ class Category(db.Model):
             "parent_id": self.parent_id,
             "is_active": self.is_active,
             "sort_order": self.sort_order,
+            "featured": bool(self.featured),
         }
         if with_children:
             data["children"] = [
-                c.to_dict() for c in sorted(self.children, key=lambda x: x.sort_order)
+                c.to_dict() for c in sorted(self.children, key=lambda x: x.sort_order or 0)
             ]
-            data["product_count"] = len(self.products)
+            # count products in this category and its direct subcategories
+            data["product_count"] = len(self.products) + sum(len(c.products) for c in self.children)
         return data
