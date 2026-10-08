@@ -117,6 +117,7 @@ def create_app():
                 + (f'<meta property="og:image" content="{img}">' if img else ""))
         page = re.sub(r"<title>.*?</title>", f"<title>{title}</title>", page, count=1, flags=re.S)
         page = re.sub(r'<meta name="description"[^>]*>', "", page, count=1)
+        page = re.sub(r'<meta property="og:[^"]*"[^>]*>\s*', "", page)
         page = page.replace("</head>", meta + "</head>", 1)
         return Response(page, mimetype="text/html")
 

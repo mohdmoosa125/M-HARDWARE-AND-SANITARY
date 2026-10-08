@@ -3,113 +3,139 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>M Hardware & Sanitary — Quality Hardware, Sanitary & Construction Products</title>
-  <meta name="description" content="Trusted hardware and sanitary store in Bhopal. Pipes, taps, tiles, sanitary ware, tools and machines.">
+  <base href="/">
+  <title>M Hardware &amp; Sanitary — Hardware, Sanitary, Plumbing &amp; Tiles in Bhopal</title>
+  <meta name="description" content="Quality hardware and sanitary products in Bhopal: pipes, fittings, taps, sanitary ware, tiles, tools and machines. Trusted products, expert guidance and reliable service.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="M Hardware &amp; Sanitary — Hardware, Sanitary, Plumbing &amp; Tiles in Bhopal">
+  <meta property="og:description" content="Quality hardware and sanitary products in Bhopal: pipes, fittings, taps, sanitary ware, tiles, tools and machines. Trusted products, expert guidance and reliable service.">
+  <meta name="theme-color" content="#0f4c81">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f4c81'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='700' font-size='34' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { corePlugins: { preflight: false } };</script>
 
-  <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/responsive.css">
 </head>
 <body data-page="home">
-
+  <a class="skip-link" href="#app">Skip to content</a>
   <div id="site-nav"></div>
 
-  <main id="app">
+  <main id="app" tabindex="-1">
 
     <section class="hero">
-      <div class="hero-inner">
-        <span class="hero-tag">Trusted Store in Bhopal</span>
-        <h1>M HARDWARE &amp; SANITARY</h1>
-        <p class="hero-sub">Quality Hardware, Sanitary &amp; Construction Products</p>
-        <p class="hero-text">
-          Everything you need for your home, bathroom and construction project —
-          pipes, taps, tiles, sanitary ware, tools and machines.
-        </p>
-        <div class="hero-buttons">
-          <a class="btn btn-accent" href="products.html">View Products</a>
-          <a class="btn btn-light" href="contact.html">Contact Us</a>
-          <a class="btn btn-whatsapp" data-whatsapp="Hello, I want to know about your products." href="#">WhatsApp Us</a>
+      <div class="wrap hero-grid">
+        <div>
+          <span class="hero-tag">Hardware · Sanitary · Plumbing · Tiles — Bhopal</span>
+          <h1>Quality Hardware &amp; Sanitary Solutions <em>For Every Home &amp; Project</em></h1>
+          <p class="hero-text">Trusted products, expert guidance and reliable service in Bhopal.</p>
+          <div class="hero-buttons">
+            <a class="btn btn-accent btn-lg" href="/products.html">Shop Products</a>
+            <a class="btn btn-outline-light btn-lg" href="/categories.html">Explore Categories</a>
+            <a class="btn btn-outline-light btn-lg" href="/contact.html">Contact Us</a>
+          </div>
+        </div>
+        <div class="hero-collage" id="heroCollage" aria-label="Featured products"></div>
+      </div>
+    </section>
+
+    <div class="band"><div class="wrap trust-row" id="trustRow"></div></div>
+
+    <section class="section">
+      <div class="section-head">
+        <div><span class="eyebrow">Shop by category</span><h2>Everything for your build &amp; bathroom</h2></div>
+        <a href="/categories.html" class="link-more">All categories →</a>
+      </div>
+      <div id="homeCategories" class="category-grid"></div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="section-head">
+        <div><span class="eyebrow">Hand-picked</span><h2>Featured products</h2></div>
+        <a href="/products.html?featured=1" class="link-more">View all →</a>
+      </div>
+      <div id="featuredProducts" class="product-grid cols-4"></div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="ai-promo">
+        <div>
+          <span class="eyebrow" style="color:#ffd27a">AI shopping assistant</span>
+          <h2>Not sure what you need?</h2>
+          <p>Ask our AI assistant. It searches our live catalog for real products, prices and stock — and adds items to your cart only when you confirm.</p>
+          <button class="btn btn-accent" onclick="openAI()">Ask the assistant</button>
+        </div>
+        <div class="ai-questions">
+          <button class="ai-q" onclick="openAI(this.dataset.q)" data-q="Which pipe is best for bathroom plumbing?"><span data-icon="sparkle"></span> Which pipe is best for bathroom plumbing?</button>
+          <button class="ai-q" onclick="openAI(this.dataset.q)" data-q="I need a tap under ₹1000"><span data-icon="sparkle"></span> I need a tap under ₹1000.</button>
+          <button class="ai-q" onclick="openAI(this.dataset.q)" data-q="Which drill should I buy?"><span data-icon="sparkle"></span> Which drill should I buy?</button>
+          <button class="ai-q" onclick="openAI(this.dataset.q)" data-q="How many tiles do I need for a 10x12 ft room?"><span data-icon="sparkle"></span> How many tiles do I need?</button>
+          <button class="ai-q" onclick="openAI(this.dataset.q)" data-q="What fittings do I need for a wash basin?"><span data-icon="sparkle"></span> What fittings do I need for this basin?</button>
         </div>
       </div>
     </section>
 
-    <section class="section">
+    <section class="section" style="padding-top:0">
       <div class="section-head">
-        <h2>Shop by Category</h2>
-        <a href="categories.html" class="link-more">View all categories →</a>
+        <div><span class="eyebrow">Save more</span><h2>Best deals</h2></div>
+        <a href="/products.html?discount=1&amp;sort=discount" class="link-more">All offers →</a>
       </div>
-      <div id="homeCategories" class="category-grid">
-        <p class="loading"><span class="spinner"></span>Loading categories…</p>
-      </div>
+      <div id="dealProducts" class="product-grid cols-4"></div>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <h2>Best Deals</h2>
-        <a href="products.html?discount=1" class="link-more">View all →</a>
-      </div>
-      <div id="dealProducts" class="product-grid">
-        <p class="loading"><span class="spinner"></span>Loading products…</p>
-      </div>
-    </section>
-
-    <section class="section section-alt">
-      <div class="section-head">
-        <h2>Featured Products</h2>
-        <a href="products.html?featured=1" class="link-more">View all →</a>
-      </div>
-      <div id="featuredProducts" class="product-grid">
-        <p class="loading"><span class="spinner"></span>Loading products…</p>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <h2>Latest Products</h2>
-        <a href="products.html?sort=newest" class="link-more">View all →</a>
-      </div>
-      <div id="latestProducts" class="product-grid">
-        <p class="loading"><span class="spinner"></span>Loading products…</p>
-      </div>
-    </section>
-
-    <section class="section section-alt">
-      <div class="section-head"><h2>Why Choose Us</h2></div>
+    <section class="section" style="padding-top:0">
+      <div class="section-head"><div><span class="eyebrow">Why choose us</span><h2>A store you can rely on</h2></div></div>
       <div class="feature-grid">
-        <div class="feature-box"><span>🏅</span><h3>Quality Products</h3><p>We stock only reliable, tested brands for homes and projects.</p></div>
-        <div class="feature-box"><span>💰</span><h3>Affordable Pricing</h3><p>Fair wholesale and retail rates on every product we sell.</p></div>
-        <div class="feature-box"><span>🚚</span><h3>Fast Supply</h3><p>Quick availability for builders, plumbers and contractors.</p></div>
-        <div class="feature-box"><span>🤝</span><h3>Customer Support</h3><p>Friendly guidance to help you pick the right product.</p></div>
+        <div class="feature"><span class="f-ico" data-icon="shield"></span><div><h3>Quality Products</h3><p>Reliable materials for homes, shops and sites.</p></div></div>
+        <div class="feature"><span class="f-ico" data-icon="tag"></span><div><h3>Competitive Pricing</h3><p>Clear prices with discounts shown upfront.</p></div></div>
+        <div class="feature"><span class="f-ico" data-icon="sparkle"></span><div><h3>Expert Guidance</h3><p>Help choosing the right pipe, tap, tile or tool.</p></div></div>
+        <div class="feature"><span class="f-ico" data-icon="grid"></span><div><h3>Wide Product Range</h3><p>Sanitary, plumbing, hardware, tiles, tools and machines.</p></div></div>
+        <div class="feature"><span class="f-ico" data-icon="truck"></span><div><h3>Reliable Service</h3><p>Order online, track it, and get a proper invoice.</p></div></div>
+        <div class="feature"><span class="f-ico" data-icon="store"></span><div><h3>Local Bhopal Support</h3><p>Call, WhatsApp or visit our store.</p></div></div>
       </div>
     </section>
 
-    <section class="cta-band">
-      <div>
-        <h2>Need a quotation for your project?</h2>
-        <p>Send us your requirement and we will get back to you quickly.</p>
+    <section class="section" style="padding-top:0">
+      <div class="section-head">
+        <div><span class="eyebrow">Just added</span><h2>New arrivals</h2></div>
+        <a href="/products.html?sort=newest" class="link-more">View all →</a>
       </div>
-      <div class="cta-actions">
-        <a class="btn btn-accent" href="contact.html">Request a Quote</a>
-        <a class="btn btn-outline-light" data-phone-link href="#">Call Now</a>
-      </div>
+      <div id="latestProducts" class="product-grid cols-4"></div>
     </section>
 
+    <section class="section" style="padding-top:0">
+      <div class="cta-band">
+        <div>
+          <p class="cta-lines">Building a home? Renovating a bathroom? Starting a construction project?</p>
+          <h2>Talk to M Hardware &amp; Sanitary.</h2>
+          <p>Get product advice and a quote for your full requirement.</p>
+        </div>
+        <div class="cta-actions">
+          <a class="btn btn-primary" data-phone-link href="/contact.html">Call Now</a>
+          <a class="btn btn-whatsapp" data-whatsapp="Hello, I need help with products for my project." href="/contact.html">WhatsApp Us</a>
+          <button class="btn btn-outline" onclick="openAI()">Get Product Advice</button>
+        </div>
+      </div>
+    </section>
   </main>
 
   <div id="site-footer"></div>
 
-  <script src="js/app.js"></script>
-  <script src="js/cart.js"></script>
-  <script src="js/categories.js"></script>
-  <script src="js/products.js"></script>
-  <script src="js/search.js"></script>
-  <script src="js/contact.js"></script>
-  <script src="js/gallery.js"></script>
-  <script src="js/ai-assistant.js"></script>
-  <script src="js/router.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/cart.js"></script>
+  <script src="/js/categories.js"></script>
+  <script src="/js/products.js"></script>
+  <script src="/js/home.js"></script>
+  <script src="/js/search.js"></script>
+  <script src="/js/contact.js"></script>
+  <script src="/js/gallery.js"></script>
+  <script src="/js/checkout.js"></script>
+  <script src="/js/account.js"></script>
+  <script src="/js/ai-assistant.js"></script>
+  <script src="/js/router.js"></script>
 </body>
 </html>

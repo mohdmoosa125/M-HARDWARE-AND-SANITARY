@@ -3,72 +3,80 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Products | M Hardware & Sanitary</title>
+  <base href="/">
+  <title>Products | M Hardware &amp; Sanitary</title>
+  <meta name="description" content="Shop pipes, fittings, taps, sanitary ware, tiles, hardware, tools and machines with live prices and stock.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Products | M Hardware &amp; Sanitary">
+  <meta property="og:description" content="Shop pipes, fittings, taps, sanitary ware, tiles, hardware, tools and machines with live prices and stock.">
+  <meta name="theme-color" content="#0f4c81">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f4c81'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='700' font-size='34' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { corePlugins: { preflight: false } };</script>
 
-  <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/responsive.css">
 </head>
 <body data-page="products">
-
+  <a class="skip-link" href="#app">Skip to content</a>
   <div id="site-nav"></div>
 
-  <main id="app">
+  <main id="app" tabindex="-1">
 
-    <div class="page-head">
-      <h1>Our Products</h1>
-      <p>Pipes, taps, tiles, sanitary ware, tools, machines and more</p>
-    </div>
-
-    <div class="section">
-      <div class="products-layout">
-
-        <aside id="filters" class="filters">
-          <p class="loading">Loading filters…</p>
+    <div class="page-head"><div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><span>/</span><span aria-current="page">Products</span></nav>
+      <h1 id="catalogTitle">All products</h1>
+      <p id="catalogSub">Genuine hardware, sanitary, plumbing and tiles — prices updated from our store.</p>
+    </div></div>
+    <div class="section section-tight">
+      <div class="catalog">
+        <div class="drawer-backdrop" id="filterBackdrop" onclick="toggleFilters(false)"></div>
+        <aside id="filters" class="filters" aria-label="Filters">
+          <div class="filters-head">
+            <h3>Filters</h3>
+            <span>
+              <button class="btn btn-ghost btn-sm" id="clearFilters" type="button">Clear all</button>
+              <button class="btn btn-ghost btn-icon filters-close" type="button" aria-label="Close filters" onclick="toggleFilters(false)" data-icon="x"></button>
+            </span>
+          </div>
+          <div id="filterBody"><p class="loading"><span class="spinner"></span>Loading filters…</p></div>
         </aside>
-
-        <div>
-          <div class="toolbar">
-            <form id="searchForm" class="search-box">
-              <input id="searchInput" placeholder="Search products, brands, SKU…">
-              <button class="btn btn-primary" type="submit">Search</button>
-            </form>
-
-            <select id="sortSelect" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px">
-              <option value="newest">Newest first</option>
-              <option value="price_asc">Price: Low → High</option>
-              <option value="price_desc">Price: High → Low</option>
-              <option value="name_asc">Name: A → Z</option>
-            </select>
+        <div id="catalogTop">
+          <div class="catalog-toolbar">
+            <button class="btn btn-outline btn-sm filter-open-btn" id="filterOpen" type="button"><span data-icon="filter"></span> Filters</button>
+            <span class="count" id="resultCount" aria-live="polite"></span>
+            <label class="sr-only" for="sortSelect">Sort by</label>
+            <select id="sortSelect"></select>
+            <div class="view-toggle" role="group" aria-label="View">
+              <button type="button" data-view="grid" aria-label="Grid view" class="active" data-icon="grid"></button>
+              <button type="button" data-view="list" aria-label="List view" data-icon="list"></button>
+            </div>
           </div>
-
-          <p class="count" id="resultCount" style="color:var(--muted);margin:0 0 14px"></p>
-
-          <div id="productsGrid" class="product-grid">
-            <p class="loading"><span class="spinner"></span>Loading products…</p>
-          </div>
-
+          <div class="active-filters" id="activeFilters"></div>
+          <div id="productsGrid" class="product-grid"></div>
           <div id="pagination" class="pagination"></div>
         </div>
       </div>
     </div>
-
   </main>
 
   <div id="site-footer"></div>
 
-  <script src="js/app.js"></script>
-  <script src="js/cart.js"></script>
-  <script src="js/categories.js"></script>
-  <script src="js/products.js"></script>
-  <script src="js/search.js"></script>
-  <script src="js/contact.js"></script>
-  <script src="js/gallery.js"></script>
-  <script src="js/ai-assistant.js"></script>
-  <script src="js/router.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/cart.js"></script>
+  <script src="/js/categories.js"></script>
+  <script src="/js/products.js"></script>
+  <script src="/js/home.js"></script>
+  <script src="/js/search.js"></script>
+  <script src="/js/contact.js"></script>
+  <script src="/js/gallery.js"></script>
+  <script src="/js/checkout.js"></script>
+  <script src="/js/account.js"></script>
+  <script src="/js/ai-assistant.js"></script>
+  <script src="/js/router.js"></script>
 </body>
 </html>

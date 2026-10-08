@@ -3,69 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contact | M Hardware & Sanitary</title>
+  <base href="/">
+  <title>Contact Us | M Hardware &amp; Sanitary</title>
+  <meta name="description" content="Call, WhatsApp, email or visit M Hardware &amp; Sanitary in Bhopal.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Contact Us | M Hardware &amp; Sanitary">
+  <meta property="og:description" content="Call, WhatsApp, email or visit M Hardware &amp; Sanitary in Bhopal.">
+  <meta name="theme-color" content="#0f4c81">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f4c81'/%3E%3Ctext x='32' y='44' font-family='Arial' font-weight='700' font-size='34' fill='white' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { corePlugins: { preflight: false } };</script>
 
-  <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/responsive.css">
 </head>
 <body data-page="contact">
-
+  <a class="skip-link" href="#app">Skip to content</a>
   <div id="site-nav"></div>
 
-  <main id="app">
-
-    <div class="page-head">
-      <h1>Contact Us</h1>
-      <p>We're happy to help with your project</p>
-    </div>
-
+  <main id="app" tabindex="-1">
+    <div class="page-head"><div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><span>/</span><span aria-current="page">Contact us</span></nav>
+      <h1>Contact us</h1>
+      <p>We're happy to help with your home or project</p>
+    </div></div>
     <div class="section">
-      <div class="products-layout" style="grid-template-columns:1fr 1.3fr">
-
-        <div class="form-card" style="margin:0;max-width:100%">
-          <h2>Store Details</h2>
-          <p id="cAddress">📍 —</p>
-          <p>📞 <a id="cPhone" href="#">—</a></p>
-          <p>💬 <a id="cWhatsapp" href="#">WhatsApp</a></p>
-          <p>✉️ <a id="cEmail" href="#">—</a></p>
-          <p>🕒 <span id="cHours">—</span></p>
-          <div id="cMap" class="mt-2"></div>
-        </div>
-
-        <div class="form-card" style="margin:0;max-width:100%">
-          <h2>Send a Message</h2>
-          <div id="contactAlert"></div>
+      <div class="contact-grid">
+        <div class="card" id="contactDetails"><p class="loading"><span class="spinner"></span>Loading…</p></div>
+        <div class="card">
+          <h2>Send a message</h2>
+          <div id="contactAlert" role="alert"></div>
           <form id="contactForm">
-            <div class="form-group"><label>Name *</label><input name="name" required></div>
-            <div class="form-row">
-              <div class="form-group"><label>Phone</label><input name="phone"></div>
-              <div class="form-group"><label>Email</label><input type="email" name="email"></div>
+            <div class="field"><label for="ctName">Name *</label><input id="ctName" name="name" required autocomplete="name"></div>
+            <div class="form-grid">
+              <div class="field"><label for="ctPhone">Phone</label><input id="ctPhone" name="phone" type="tel" autocomplete="tel"></div>
+              <div class="field"><label for="ctEmail">Email</label><input id="ctEmail" type="email" name="email" autocomplete="email"></div>
             </div>
-            <div class="form-group"><label>Message *</label>
-              <textarea name="message" required></textarea></div>
-            <button class="btn btn-primary btn-block" type="submit">Send Message</button>
+            <div class="field"><label for="ctMsg">Message *</label><textarea id="ctMsg" name="message" required rows="5"></textarea></div>
+            <button class="btn btn-primary btn-block" type="submit">Send message</button>
           </form>
         </div>
       </div>
     </div>
-
   </main>
 
   <div id="site-footer"></div>
 
-  <script src="js/app.js"></script>
-  <script src="js/cart.js"></script>
-  <script src="js/categories.js"></script>
-  <script src="js/products.js"></script>
-  <script src="js/search.js"></script>
-  <script src="js/contact.js"></script>
-  <script src="js/gallery.js"></script>
-  <script src="js/ai-assistant.js"></script>
-  <script src="js/router.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/cart.js"></script>
+  <script src="/js/categories.js"></script>
+  <script src="/js/products.js"></script>
+  <script src="/js/home.js"></script>
+  <script src="/js/search.js"></script>
+  <script src="/js/contact.js"></script>
+  <script src="/js/gallery.js"></script>
+  <script src="/js/checkout.js"></script>
+  <script src="/js/account.js"></script>
+  <script src="/js/ai-assistant.js"></script>
+  <script src="/js/router.js"></script>
 </body>
 </html>

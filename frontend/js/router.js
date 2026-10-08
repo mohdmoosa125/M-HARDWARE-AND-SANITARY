@@ -2,34 +2,18 @@
    router.js — smooth SPA-like page transitions
    ----------------------------------------------------------------
    Instead of reloading the browser on every link click, this file:
-     1. Intercepts clicks on internal links
+     1. Intercepts clicks on internal links (*.html and /products/<slug>)
      2. Fetches the target HTML in the background
      3. Extracts only <main id="app">…</main>
      4. Fades out the old content, fades in the new
-     5. Re-runs that page's init function
-   The nav, footer, CSS and JS files are never re-downloaded.
+     5. Re-runs that page's init function (PAGE_INITS in app.js)
+   The header, footer, CSS and JS files are never re-downloaded.
    ================================================================ */
 
-/* ---------- map every page file to its init + title ---------- */
-const ROUTES = {
-  "index.html": { init: "initHome", title: "Home" },
-  "products.html": { init: "initProductsPage", title: "Products" },
-  "product-details.html": {
-    init: "initProductDetails",
-    title: "Product Details",
-  },
-  "categories.html": { init: "initCategoriesPage", title: "Categories" },
-  "gallery.html": { init: "initGalleryPage", title: "Gallery" },
-  "about.html": { init: null, title: "About Us" },
-  "contact.html": { init: "initContactPage", title: "Contact Us" },
-  "cart.html": { init: "initCartPage", title: "Your Cart" },
-};
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ROUTABLE = /^\/?([\w-]+\.html|products\/[^/?#]+)(\?[^#]*)?(#.*)?$/;
 
-/* ----------------------------------------------------------------
-   Top progress bar — thin blue line that slides across while loading
-   ---------------------------------------------------------------- */
+/* ---------- top progress bar ---------- */
 function ensureProgressBar() {
   if (document.getElementById("navProgress")) return;
   const bar = document.createElement("div");
@@ -55,120 +39,96 @@ function finishProgress() {
   bar.style.width = "100%";
   setTimeout(() => {
     bar.style.opacity = "0";
-    setTimeout(() => {
-      bar.style.width = "0%";
-    }, 300);
+    setTimeout(() => (bar.style.width = "0%"), 300);
   }, 150);
 }
 
-/* ----------------------------------------------------------------
-   Swap the <main id="app"> content with a smooth fade
-   ---------------------------------------------------------------- */
+/* ---------- swap <main id="app"> with a short fade ---------- */
 async function swapContent(newHtml, newPage) {
   const app = document.getElementById("app");
   if (!app) return;
-
-  app.style.transition = "opacity .18s ease, transform .18s ease";
-  app.style.opacity = "0";
-  app.style.transform = "translateY(10px)";
-
-  await sleep(180);
-
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduce) {
+    app.style.transition = "opacity .15s ease, transform .15s ease";
+    app.style.opacity = "0";
+    app.style.transform = "translateY(8px)";
+    await sleep(150);
+  }
   app.innerHTML = newHtml;
   document.body.dataset.page = newPage;
-
   void app.offsetHeight;
-
   app.style.opacity = "1";
   app.style.transform = "translateY(0)";
-
-  window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-/* ----------------------------------------------------------------
-   Main navigation function
-   ---------------------------------------------------------------- */
+/* ---------- main navigation ---------- */
+let navToken = 0;
+
 async function navigateTo(href, pushState = true) {
   if (!href) return;
-  const [pathOnly] = href.split("?");
-  const path = pathOnly || "index.html";
-  const route = ROUTES[path] || ROUTES["index.html"];
-
+  const url = new URL(href, location.origin);
+  const token = ++navToken;
   showProgress();
-
   try {
-    const res = await fetch(href, { cache: "no-store" });
-    if (!res.ok) throw new Error("Page not found: " + href);
+    const res = await fetch(url.pathname + url.search, { cache: "no-store" });
+    if (!res.ok && res.status !== 404) throw new Error("Page not found");
     const html = await res.text();
+    if (token !== navToken) return;            // a newer click won
 
     const parsed = new DOMParser().parseFromString(html, "text/html");
     const newMain = parsed.getElementById("app");
-    const content = newMain ? newMain.innerHTML : parsed.body.innerHTML;
+    if (!newMain) throw new Error("Bad page");
     const newPage = parsed.body.dataset.page || "home";
 
-    await swapContent(content, newPage);
+    if (pushState) history.pushState({ href: url.pathname + url.search + url.hash }, "", url.pathname + url.search + url.hash);
+    await swapContent(newMain.innerHTML, newPage);
 
-    document.title = parsed.title || route.title;
+    document.title = parsed.title || document.title;
+    const desc = parsed.querySelector('meta[name="description"]');
+    if (desc) setMeta(null, desc.content);
 
-    if (pushState) {
-      history.pushState({ href }, "", href);
+    if (url.hash && document.querySelector(url.hash)) {
+      document.querySelector(url.hash).scrollIntoView();
+    } else {
+      window.scrollTo({ top: 0, behavior: "instant" });
     }
 
-    if (route.init && typeof window[route.init] === "function") {
-      requestAnimationFrame(() => {
-        try {
-          window[route.init]();
-        } catch (err) {
-          console.error("Init failed for", route.init, err);
-        }
-      });
-    }
-
-    if (typeof renderNav === "function") renderNav();
-    if (typeof renderFooter === "function") renderFooter();
-    if (typeof applyWhatsappLinks === "function") applyWhatsappLinks();
-    if (typeof updateCartCount === "function") updateCartCount();
+    renderNav();
+    renderFooter();
+    applyWhatsappLinks();
+    runPageInit(newPage);
+    if (typeof renderCompareBar === "function") renderCompareBar();
+    document.getElementById("app")?.focus({ preventScroll: true });
   } catch (err) {
     console.error(err);
-    const app = document.getElementById("app");
-    if (app)
-      app.innerHTML = `<p class="empty">Unable to load page. Please try again.</p>`;
+    location.href = url.href;                  // fall back to a normal page load
   } finally {
     finishProgress();
   }
 }
 
-/* ----------------------------------------------------------------
-   Intercept all internal link clicks
-   ---------------------------------------------------------------- */
+/* ---------- intercept internal link clicks ---------- */
 document.addEventListener("click", (e) => {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   const link = e.target.closest("a");
-  if (!link) return;
-  if (link.target === "_blank") return;
-  if (link.hasAttribute("download")) return;
-
+  if (!link || link.target === "_blank" || link.hasAttribute("download") || link.dataset.noRouter !== undefined) return;
   const href = link.getAttribute("href");
-  if (!href) return;
+  if (!href || /^(https?:|mailto:|tel:|#|javascript:)/i.test(href)) return;
+  if (!ROUTABLE.test(href)) return;
 
-  if (/^(https?:|mailto:|tel:|#|javascript:)/i.test(href)) return;
-  if (!/\.html(\?|$)/.test(href)) return;
-
+  const target = new URL(href, location.origin);
+  if (target.pathname === location.pathname && target.search === location.search && target.hash) return;
   e.preventDefault();
   navigateTo(href, true);
 });
 
-/* ----------------------------------------------------------------
-   Browser back / forward
-   ---------------------------------------------------------------- */
+/* ---------- browser back / forward ---------- */
 window.addEventListener("popstate", (e) => {
-  const href =
-    (e.state && e.state.href) ||
-    location.pathname.split("/").pop() + location.search ||
-    "index.html";
+  const href = (e.state && e.state.href) || location.pathname + location.search;
   navigateTo(href, false);
 });
 
-/* ----------------------------------------------------------------
-   Make sure the progress bar element exists on first load
-   ---------------------------------------------------------------- */
-document.addEventListener("DOMContentLoaded", ensureProgressBar);
+document.addEventListener("DOMContentLoaded", () => {
+  ensureProgressBar();
+  history.replaceState({ href: location.pathname + location.search + location.hash }, "");
+});
