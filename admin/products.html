@@ -4,119 +4,237 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Products | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
   <script src="js/admin.js"></script>
   <script>
-    let allProducts = [];
-    let imageInfo = {};
-    const qs = new URLSearchParams(location.search);
-    const statusFilter = qs.get('missing_images') === '1' ? ['missing', 'failed']
-      : (qs.get('image_status') ? qs.get('image_status').split(',') : null);
+    const LIMIT = 50;
+    const IMG_FILTERS = [["", "All image statuses"], ["missing,failed", "Missing or failed"], ["missing", "Missing"],
+      ["failed", "Failed"], ["fallback", "Fallback"], ["processing", "Processing"], ["ready", "Ready"]];
+    const SORTS = [["newest", "Newest first"], ["name_asc", "Name A–Z"], ["price_asc", "Price: low to high"],
+      ["price_desc", "Price: high to low"], ["discount", "Biggest discount"], ["featured", "Featured first"]];
+
+    const state = {
+      page: Number(qsGet("page")) || 1,
+      q: qsGet("q") || "",
+      category: qsGet("category") || "",
+      brand: qsGet("brand") || "",
+      image_status: qsGet("missing_images") === "1" ? "missing,failed" : (qsGet("image_status") || ""),
+      sort: qsGet("sort") || "newest",
+    };
+    let rows = [];
+    let flatCats = [];
+    const selected = new Set();
 
     async function init() {
-      const host = await renderAdminShell("products.html");
+      const host = await renderAdminShell("products.html", "Products");
       if (!host) return;
-      document.getElementById("pageTitle").textContent = "Products";
+
+      try {
+        const tree = (await api("/categories?tree=1")).data || [];
+        tree.forEach((c) => {
+          flatCats.push([c.id, c.name]);
+          (c.children || []).forEach((s) => flatCats.push([s.id, "— " + s.name]));
+        });
+      } catch { flatCats = []; }
+
+      const imgOpts = IMG_FILTERS.some(([v]) => v === state.image_status) ? IMG_FILTERS
+        : IMG_FILTERS.concat([[state.image_status, state.image_status]]);
 
       host.innerHTML = `
-        <div class="toolbar">
-          <input id="searchBox" placeholder="Search products…" style="flex:1;min-width:200px">
-          <button class="btn btn-outline" id="genBtn">🖼 Generate Missing Images</button>
-          <span id="genStatus" style="font-size:13px;color:#6b7280"></span>
-          <a class="btn btn-primary" href="product-form.html">➕ Add Product</a>
-        </div>
         <div class="card">
-          <div id="productTable"><p class="loading">Loading products…</p></div>
+          <div class="card-head">
+            <div><h2>Product catalogue</h2><p class="sub" id="countNote">&nbsp;</p></div>
+            <div class="hstack">
+              <button class="btn btn-outline" id="genMissing" title="Generates images for up to 20 products without one">${icon("image")}Generate Missing Images</button>
+              <button class="btn btn-outline" id="genAll">${icon("sparkles")}Generate All</button>
+              <a class="btn btn-primary" href="product-form.html">${icon("plus")}Add product</a>
+            </div>
+          </div>
+          <div class="progress-panel" id="jobPanel" hidden></div>
+
+          <div class="toolbar" role="search">
+            <label class="sr-only" for="searchBox">Search products</label>
+            <input id="searchBox" class="search" type="search" placeholder="Search name, brand, SKU…" value="${esc(state.q)}">
+            <label class="sr-only" for="catFilter">Category</label>
+            <select id="catFilter">${optionList(flatCats, state.category, "All categories")}</select>
+            <label class="sr-only" for="imgFilter">Image status</label>
+            <select id="imgFilter">${optionList(imgOpts, state.image_status)}</select>
+            <label class="sr-only" for="sortSel">Sort</label>
+            <select id="sortSel">${optionList(SORTS, state.sort)}</select>
+          </div>
+          <div id="brandChip"></div>
+          <div id="bulkBar"></div>
+          <div id="productTable">${loadingHTML("Loading products…")}</div>
+          <div id="pager"></div>
         </div>`;
 
-      document.getElementById("searchBox").addEventListener("input", (e) => {
-        renderTable(e.target.value.toLowerCase());
-      });
+      const reload = () => { state.page = 1; selected.clear(); load(); };
+      document.getElementById("searchBox").addEventListener("input", debounce((e) => { state.q = e.target.value.trim(); reload(); }, 350));
+      document.getElementById("catFilter").addEventListener("change", (e) => { state.category = e.target.value; reload(); });
+      document.getElementById("imgFilter").addEventListener("change", (e) => { state.image_status = e.target.value; reload(); });
+      document.getElementById("sortSel").addEventListener("change", (e) => { state.sort = e.target.value; reload(); });
 
-      document.getElementById("genBtn").addEventListener("click", (e) =>
-        generateMissingImages(e.target, document.getElementById("genStatus"), loadProducts));
+      const gm = document.getElementById("genMissing"), ga = document.getElementById("genAll");
+      const panel = document.getElementById("jobPanel");
+      gm.addEventListener("click", () => runImageJob("missing", panel, { buttons: [gm, ga], limit: 20, onDone: load }));
+      ga.addEventListener("click", () => runImageJob("all", panel, { buttons: [gm, ga], onDone: load }));
 
-      await loadProducts();
+      await load();
     }
 
-    async function loadProducts() {
+    function syncUrl() {
+      setQuery({ q: state.q, category: state.category, brand: state.brand, sort: state.sort === "newest" ? "" : state.sort,
+                 image_status: state.image_status, missing_images: "", page: state.page > 1 ? state.page : "" });
+    }
+
+    async function load() {
+      syncUrl();
+      const box = document.getElementById("productTable");
+      const chip = document.getElementById("brandChip");
+      chip.innerHTML = state.brand ? `<div class="alert alert-info hstack">Showing brand <b>${esc(state.brand)}</b>
+        <button class="btn btn-outline btn-sm" id="clearBrand">Clear brand filter</button></div>` : "";
+      if (state.brand) document.getElementById("clearBrand").onclick = () => { state.brand = ""; state.page = 1; load(); };
+
+      const p = new URLSearchParams({ page: state.page, limit: LIMIT, sort: state.sort });
+      ["q", "category", "brand", "image_status"].forEach((k) => state[k] && p.set(k, state[k]));
+      box.style.opacity = rows.length ? ".55" : "";
       try {
-        // fetch every page (API caps limit at 100)
-        allProducts = [];
-        let page = 1, pages = 1;
-        do {
-          const res = await api("/products?limit=100&page=" + page);
-          allProducts = allProducts.concat(res.data || []);
-          pages = (res.meta && res.meta.pages) || 1;
-        } while (++page <= pages);
-        try { imageInfo = (await api("/admin/images/report")).data.products; } catch { imageInfo = {}; }
-        renderTable("");
+        const res = await api("/products?" + p);
+        rows = res.data || [];
+        const meta = res.meta || { page: 1, pages: 1, total: rows.length, limit: LIMIT };
+        if (meta.pages && state.page > meta.pages) { state.page = meta.pages; return load(); }
+        document.getElementById("countNote").textContent = `${num(meta.total)} product${meta.total === 1 ? "" : "s"}`;
+        render();
+        renderPager(document.getElementById("pager"), meta, (pg) => { state.page = pg; load(); window.scrollTo({ top: 0 }); });
       } catch (err) {
-        document.getElementById("productTable").innerHTML =
-          `<p class="empty">Could not load products: ${esc(err.message)}</p>`;
+        box.innerHTML = errorHTML(err.message);
       }
+      box.style.opacity = "";
     }
 
-    function renderTable(filter) {
-      const host = document.getElementById("productTable");
-      const base = statusFilter
-        ? allProducts.filter((p) => statusFilter.includes((imageInfo[p.id] || {}).status))
-        : allProducts;
-      const items = filter
-        ? base.filter((p) =>
-            (p.name + " " + (p.brand || "") + " " + (p.sku || "")).toLowerCase().includes(filter))
-        : base;
-
-      if (!items.length) {
-        host.innerHTML = `<p class="empty">No products found.</p>`;
+    function render() {
+      const box = document.getElementById("productTable");
+      renderBulkBar();
+      if (!rows.length) {
+        const filtered = state.q || state.category || state.brand || state.image_status;
+        box.innerHTML = emptyHTML(filtered ? "No products match these filters." : "No products yet. Add your first product.");
         return;
       }
-
-      host.innerHTML = `
+      const allOn = rows.every((p) => selected.has(p.id));
+      box.innerHTML = `
         <div class="table-wrap"><table>
-          <thead>
-            <tr>
-              <th>Image</th><th>Image status</th><th>Name</th><th>Category</th>
-              <th>Price</th><th>Stock</th><th>Featured</th><th>Actions</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th><input type="checkbox" id="selAll" aria-label="Select all products on this page" ${allOn ? "checked" : ""}></th>
+            <th>Product</th><th>Category</th><th class="right">Price</th><th>Stock</th>
+            <th>Image</th><th>Actions</th>
+          </tr></thead>
           <tbody>
-            ${items.map((p) => `
-              <tr>
-                <td>${p.image ? `<img class="thumb" src="${esc(p.image)}">` : "—"}</td>
-                <td>${imageBadge(imageInfo[p.id])}</td>
-                <td><b>${esc(p.name)}</b><br><small style="color:#6b7280">${esc(p.brand || "")}</small></td>
+            ${rows.map((p) => `
+              <tr class="${selected.has(p.id) ? "is-selected" : ""}">
+                <td><input type="checkbox" class="rowSel" data-id="${p.id}" aria-label="Select ${esc(p.name)}" ${selected.has(p.id) ? "checked" : ""}></td>
+                <td style="min-width:260px"><div class="hstack" style="flex-wrap:nowrap;align-items:flex-start">
+                  ${p.image ? `<img class="thumb" src="${esc(p.image)}" alt="" loading="lazy">` : `<span class="thumb-empty">None</span>`}
+                  <div><a class="cell-title" href="product-form.html?id=${p.id}">${esc(p.name)}</a>
+                  <div class="cell-sub">${esc([p.brand, p.sku].filter(Boolean).join(" · ") || "—")}</div>
+                  ${p.featured ? `<span class="badge badge-blue">Featured</span>` : ""}</div></div></td>
                 <td>${esc(p.category_name || "—")}</td>
-                <td>${money(p.final_price)}</td>
-                <td>${p.stock <= 3
-                  ? `<span class="badge badge-red">${p.stock}</span>`
-                  : `<span class="badge badge-green">${p.stock}</span>`}</td>
-                <td>${p.featured ? "⭐" : "—"}</td>
-                <td class="row-actions">
-                  <a class="btn btn-sm btn-outline" href="product-form.html?id=${p.id}">Edit</a>
-                  ${(imageInfo[p.id] || {}).status === "ready" ? "" :
-                    `<button class="btn btn-sm btn-outline" onclick="regen(${p.id}, this)">🔄 Image</button>`}
-                  <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">Delete</button>
-                </td>
+                <td class="right num nowrap">${money(p.final_price)}${p.discount_percent ? `<div class="cell-sub">${Number(p.discount_percent)}% off ${money(p.price)}</div>` : ""}</td>
+                <td>${stockBadge(p)}</td>
+                <td>${imageBadge({ status: p.image_status || (p.image ? "ready" : "missing") })}</td>
+                <td><div class="row-actions">
+                  <a class="btn btn-outline btn-sm" href="product-form.html?id=${p.id}">Edit</a>
+                  <button class="btn btn-outline btn-sm" onclick="duplicate(${p.id}, this)">Duplicate</button>
+                  <button class="btn btn-outline btn-sm" onclick="regen(${p.id}, this)" aria-label="Regenerate image for ${esc(p.name)}" title="Regenerate image">${icon("refresh")}Regenerate</button>
+                  <button class="btn btn-danger-outline btn-sm" onclick="deleteProduct(${p.id})">Delete</button>
+                </div></td>
               </tr>`).join("")}
           </tbody>
         </table></div>`;
+
+      document.getElementById("selAll").addEventListener("change", (e) => {
+        rows.forEach((p) => (e.target.checked ? selected.add(p.id) : selected.delete(p.id)));
+        render();
+      });
+      box.querySelectorAll(".rowSel").forEach((cb) => cb.addEventListener("change", () => {
+        const id = Number(cb.dataset.id);
+        cb.checked ? selected.add(id) : selected.delete(id);
+        cb.closest("tr").classList.toggle("is-selected", cb.checked);
+        document.getElementById("selAll").checked = rows.every((p) => selected.has(p.id));
+        renderBulkBar();
+      }));
     }
 
-    function regen(id, btn) {
-      regenerateImage(id, btn, () => loadProducts());
+    function renderBulkBar() {
+      const bar = document.getElementById("bulkBar");
+      if (!selected.size) { bar.innerHTML = ""; return; }
+      bar.innerHTML = `<div class="bulkbar" role="region" aria-label="Bulk actions">
+        <b>${selected.size} selected</b>
+        <button class="btn btn-outline btn-sm" data-bulk="feature">Set featured</button>
+        <button class="btn btn-outline btn-sm" data-bulk="unfeature">Unfeature</button>
+        <label class="sr-only" for="bulkAvail">Set availability</label>
+        <select id="bulkAvail"><option value="">Set availability…</option><option value="1">Available</option><option value="0">Unavailable</option></select>
+        <label class="sr-only" for="bulkCat">Set category</label>
+        <select id="bulkCat">${optionList([["__none", "No category"]].concat(flatCats), "", "Set category…")}</select>
+        <button class="btn btn-danger-outline btn-sm" data-bulk="delete">Delete selected</button>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost btn-sm" data-bulk="clear">Clear selection</button>
+      </div>`;
+      bar.querySelectorAll("[data-bulk]").forEach((b) => b.addEventListener("click", () => bulk(b.dataset.bulk, b)));
+      document.getElementById("bulkAvail").addEventListener("change", (e) => e.target.value !== "" && bulk("avail", e.target, e.target.value === "1"));
+      document.getElementById("bulkCat").addEventListener("change", (e) => e.target.value !== "" && bulk("cat", e.target, e.target.value === "__none" ? null : Number(e.target.value)));
+    }
+
+    async function bulk(kind, el, value) {
+      if (kind === "clear") { selected.clear(); render(); return; }
+      const ids = [...selected];
+      let body;
+      if (kind === "delete") {
+        const ok = await confirmDialog({ title: `Delete ${ids.length} product(s)?`, message: "This permanently removes the selected products. Existing orders keep their line items.", confirmLabel: "Delete products", danger: true });
+        if (!ok) return;
+        body = { ids, action: "delete" };
+      } else {
+        const fields = kind === "feature" ? { featured: true } : kind === "unfeature" ? { featured: false }
+          : kind === "avail" ? { availability: value } : { category_id: value };
+        body = { ids, action: "update", fields };
+      }
+      el.disabled = true;
+      try {
+        const res = await api("/products/bulk", { method: "POST", body: JSON.stringify(body) });
+        toast(res.message || "Done", "success");
+        if (kind === "delete") selected.clear();
+        await load();
+      } catch (e) { toast(e.message, "error"); }
+      el.disabled = false;
+    }
+
+    function regen(id, btn) { regenerateImage(id, btn, () => load()); }
+
+    async function duplicate(id, btn) {
+      await withBusy(btn, async () => {
+        try {
+          const res = await api(`/products/${id}/duplicate`, { method: "POST" });
+          toast(res.message || "Product duplicated", "success");
+          if (res.data && res.data.id) location.href = "product-form.html?id=" + res.data.id;
+        } catch (e) { toast(e.message, "error"); }
+      }, "Duplicating…");
     }
 
     async function deleteProduct(id) {
-      if (!confirm("Delete this product permanently?")) return;
+      const p = rows.find((r) => r.id === id);
+      const ok = await confirmDialog({ title: "Delete product?", message: `"${p ? p.name : "This product"}" will be permanently deleted.`, confirmLabel: "Delete", danger: true });
+      if (!ok) return;
       try {
         await api("/products/" + id, { method: "DELETE" });
-        allProducts = allProducts.filter((p) => p.id !== id);
-        renderTable(document.getElementById("searchBox").value.toLowerCase());
+        selected.delete(id);
+        toast("Product deleted", "success");
+        await load();
       } catch (err) {
-        alert("Could not delete: " + err.message);
+        toast("Could not delete: " + err.message, "error");
       }
     }
 

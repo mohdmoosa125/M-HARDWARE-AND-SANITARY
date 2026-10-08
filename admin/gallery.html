@@ -4,46 +4,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gallery | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
   <script src="js/admin.js"></script>
   <script>
+    const GAL_CATS = ["Shop", "Sanitary", "Tiles", "Hardware", "Machines", "Products", "Projects"];
     let uploadedUrl = "";
 
     async function init() {
-      const host = await renderAdminShell("gallery.html");
+      const host = await renderAdminShell("gallery.html", "Gallery");
       if (!host) return;
-      document.getElementById("pageTitle").textContent = "Gallery";
 
       host.innerHTML = `
-        <div class="card">
-          <h2>Add Image</h2>
-          <div id="galAlert"></div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Title</label>
-              <input id="gTitle" placeholder="e.g. Showroom front">
-            </div>
-            <div class="form-group">
-              <label>Category</label>
-              <select id="gCategory">
-                ${["Shop","Sanitary","Tiles","Hardware","Machines","Products","Projects"]
-                  .map((c) => `<option>${c}</option>`).join("")}
-              </select>
-            </div>
+        <div class="grid-2 grid-side">
+          <div class="card">
+            <h2>Add image</h2>
+            <div class="form-group"><label for="gTitle">Title</label>
+              <input id="gTitle" placeholder="e.g. Showroom front"></div>
+            <div class="form-group"><label for="gCategory">Category</label>
+              <select id="gCategory">${GAL_CATS.map((c) => `<option>${c}</option>`).join("")}</select></div>
+            <div class="form-group"><label for="gFile">Image file</label>
+              <input type="file" id="gFile" accept="image/*">
+              <div class="img-preview" id="gPreview"></div></div>
+            <button class="btn btn-primary" id="gAdd">${icon("plus")}Add to gallery</button>
           </div>
-          <div class="form-group">
-            <label>Image file</label>
-            <input type="file" id="gFile" accept="image/*">
-            <div id="gPreview" style="margin-top:10px"></div>
+          <div class="card">
+            <div class="card-head"><h2>Gallery images</h2><span class="sub" id="gCount"></span></div>
+            <div id="galGrid">${loadingHTML()}</div>
           </div>
-          <button class="btn btn-primary" id="gAdd">➕ Add to Gallery</button>
-        </div>
-
-        <div class="card">
-          <h2>Gallery Images</h2>
-          <div id="galGrid"><p class="loading">Loading…</p></div>
         </div>`;
 
       document.getElementById("gFile").addEventListener("change", uploadImage);
@@ -54,72 +46,68 @@
     async function uploadImage(e) {
       const file = e.target.files[0];
       if (!file) return;
-
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload/gallery", {
-        method: "POST", body: fd, credentials: "same-origin",
-      });
-      const data = await res.json();
-      if (data.success) {
-        uploadedUrl = data.data.url;
-        document.getElementById("gPreview").innerHTML =
-          `<img src="${uploadedUrl}" style="max-width:200px;border-radius:10px">`;
-      } else {
-        alert(data.message);
+      const prev = document.getElementById("gPreview");
+      prev.innerHTML = loadingHTML("Uploading…");
+      try {
+        uploadedUrl = await apiUpload("gallery", file);
+        prev.innerHTML = `<div class="img-tile" style="width:200px"><img src="${esc(uploadedUrl)}" alt="Upload preview" style="width:200px;height:140px"></div>`;
+      } catch (err) {
+        uploadedUrl = "";
+        prev.innerHTML = "";
+        toast("Upload failed: " + err.message, "error");
       }
     }
 
-    async function addToGallery() {
-      const box = document.getElementById("galAlert");
-      if (!uploadedUrl) {
-        box.innerHTML = `<div class="alert alert-error">Please choose an image first.</div>`;
-        return;
-      }
-      try {
-        await api("/gallery", {
-          method: "POST",
-          body: JSON.stringify({
-            title: document.getElementById("gTitle").value,
-            category: document.getElementById("gCategory").value,
-            image: uploadedUrl,
-          }),
-        });
-        box.innerHTML = `<div class="alert alert-success">Image added.</div>`;
-        uploadedUrl = "";
-        document.getElementById("gPreview").innerHTML = "";
-        document.getElementById("gTitle").value = "";
-        await loadGallery();
-      } catch (err) {
-        box.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
-      }
+    async function addToGallery(e) {
+      if (!uploadedUrl) { toast("Please choose an image first.", "error"); return; }
+      await withBusy(e.currentTarget, async () => {
+        try {
+          await api("/gallery", {
+            method: "POST",
+            body: JSON.stringify({
+              title: document.getElementById("gTitle").value,
+              category: document.getElementById("gCategory").value,
+              image: uploadedUrl,
+            }),
+          });
+          toast("Image added to gallery", "success");
+          uploadedUrl = "";
+          document.getElementById("gPreview").innerHTML = "";
+          document.getElementById("gTitle").value = "";
+          document.getElementById("gFile").value = "";
+          await loadGallery();
+        } catch (err) {
+          toast(err.message, "error");
+        }
+      }, "Adding…");
     }
 
     async function loadGallery() {
       const host = document.getElementById("galGrid");
       try {
-        const res = await api("/gallery");
-        const items = res.data || [];
+        const items = (await api("/gallery")).data || [];
+        document.getElementById("gCount").textContent = items.length ? `${items.length} images` : "";
         host.innerHTML = items.length ? `
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+          <div class="gallery-grid">
             ${items.map((g) => `
-              <div style="position:relative">
-                <img src="${esc(g.image)}" style="width:100%;height:130px;object-fit:cover;border-radius:10px">
-                <div style="font-size:.8rem;margin-top:4px">${esc(g.title || "")}
-                  <span class="badge badge-grey">${esc(g.category)}</span></div>
-                <button class="btn btn-sm btn-danger" style="position:absolute;top:6px;right:6px"
-                  onclick="delImage(${g.id})">✕</button>
-              </div>`).join("")}
-          </div>` : `<p class="empty">No gallery images yet.</p>`;
+              <figure class="gallery-item" style="margin:0">
+                <a href="${esc(g.image)}" target="_blank" rel="noopener"><img src="${esc(g.image)}" alt="${esc(g.title || "Gallery image")}" loading="lazy"></a>
+                <figcaption class="hstack">
+                  <span style="min-width:0"><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.title || "Untitled")}</span>
+                    <span class="badge badge-grey no-dot">${esc(g.category)}</span></span>
+                  <button class="btn btn-danger-outline btn-sm" onclick="delImage(${Number(g.id)})" aria-label="Delete image ${esc(g.title || "")}">Delete</button>
+                </figcaption>
+              </figure>`).join("")}
+          </div>` : emptyHTML("No gallery images yet.");
       } catch (err) {
-        host.innerHTML = `<p class="empty">${esc(err.message)}</p>`;
+        host.innerHTML = errorHTML(err.message);
       }
     }
 
     async function delImage(id) {
-      if (!confirm("Delete this image?")) return;
-      await api("/gallery/" + id, { method: "DELETE" });
-      await loadGallery();
+      if (!(await confirmDialog({ title: "Delete image?", message: "This image will be removed from the gallery.", confirmLabel: "Delete", danger: true }))) return;
+      try { await api("/gallery/" + id, { method: "DELETE" }); toast("Image deleted", "success"); await loadGallery(); }
+      catch (err) { toast(err.message, "error"); }
     }
 
     init();

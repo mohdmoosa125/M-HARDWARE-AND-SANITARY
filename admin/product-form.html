@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Product Form | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
@@ -12,125 +15,124 @@
     let editingId = null;
     let categories = [];
     let uploadedImage = "";
+    let imageStatus = "";
     let extraImages = [];
 
+    const TEXT_FIELDS = ["name", "slug", "brand", "sku", "price", "discount_price", "unit", "stock", "min_stock",
+      "short_description", "description", "material", "size", "color", "weight",
+      "finish", "thickness", "pieces_per_box", "coverage"];
+
+    const field = (name, label, attrs = "", help = "") => `
+      <div class="form-group"><label for="f_${name}">${label}</label>
+        <input id="f_${name}" name="${name}" ${attrs}>
+        ${help ? `<div class="help">${help}</div>` : ""}<div class="field-error" data-err="${name}" hidden></div></div>`;
+
     async function init() {
-      const host = await renderAdminShell("products.html");
+      editingId = qsGet("id");
+      const host = await renderAdminShell("products.html", editingId ? "Edit product" : "Add product");
       if (!host) return;
 
-      editingId = new URLSearchParams(location.search).get("id");
-      document.getElementById("pageTitle").textContent =
-        editingId ? "Edit Product" : "Add Product";
-
-      // load categories for the dropdown
-      try {
-        const res = await api("/categories");
-        categories = res.data || [];
-      } catch { categories = []; }
+      try { categories = (await api("/categories?tree=1")).data || []; } catch { categories = []; }
 
       host.innerHTML = `
-        <div class="card">
-          <div id="formAlert"></div>
-          <form id="productForm">
-            <div class="form-row">
-              <div class="form-group"><label>Product Name *</label>
-                <input name="name" required></div>
-              <div class="form-group"><label>Brand</label>
-                <input name="brand"></div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group"><label>Category</label>
-                <select name="category_id" id="catSelect"></select></div>
-              <div class="form-group"><label>SKU</label>
-                <input name="sku"></div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group"><label>Price (₹) *</label>
-                <input type="number" step="0.01" name="price" required></div>
-              <div class="form-group"><label>Discount Price (₹)</label>
-                <input type="number" step="0.01" name="discount_price"></div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group"><label>Unit</label>
-                <input name="unit" placeholder="piece / box / kg"></div>
-              <div class="form-group"><label>Stock</label>
-                <input type="number" name="stock" value="0"></div>
-            </div>
-
-            <div class="form-group"><label>Short Description</label>
-              <input name="short_description"></div>
-
-            <div class="form-group"><label>Full Description</label>
-              <textarea name="description"></textarea></div>
-
-            <div class="form-row">
-              <div class="form-group"><label>Material</label><input name="material"></div>
-              <div class="form-group"><label>Size</label><input name="size"></div>
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label>Colour</label><input name="color"></div>
-              <div class="form-group"><label>Weight</label><input name="weight"></div>
-            </div>
-
-            <h3 class="mt-2">Tile / Sanitary Extras (optional)</h3>
-            <div class="form-row">
-              <div class="form-group"><label>Finish</label><input name="finish"></div>
-              <div class="form-group"><label>Thickness</label><input name="thickness"></div>
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label>Pieces per box</label>
-                <input type="number" name="pieces_per_box"></div>
-              <div class="form-group"><label>Coverage</label>
-                <input name="coverage" placeholder="e.g. 1.44 sq m"></div>
-            </div>
-
-            <div class="form-group">
-              <label>Product Image</label>
-              <input type="file" id="imageFile" accept="image/*">
-              ${editingId ? `<button type="button" class="btn btn-outline btn-sm" id="regenBtn" style="margin-left:8px">🔄 Generate with AI</button>` : ""}
-              <input type="hidden" name="image" id="imagePath">
-              <div id="imagePreview" style="margin-top:10px"></div>
-            </div>
-
-            <div class="form-group">
-              <label>Additional Images (optional)</label>
-              <input type="file" id="extraFiles" accept="image/*" multiple>
-              <input type="hidden" name="additional_images" id="extraPaths">
-              <div id="extraPreview" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"></div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group checkbox-row">
-                <input type="checkbox" name="availability" id="availability" checked>
-                <label for="availability" style="margin:0">Available in stock</label>
+        <div class="hstack" style="margin-bottom:14px">
+          <a class="btn btn-ghost btn-sm" href="products.html">← Back to products</a>
+          ${editingId ? `<span class="spacer"></span><span class="muted small" id="slugLink"></span>` : ""}
+        </div>
+        <div id="formAlert"></div>
+        <form id="productForm" novalidate>
+          <div class="grid-2" style="align-items:start">
+            <div class="card">
+              <h2>Basic information</h2>
+              ${field("name", "Product name *", "required maxlength=200")}
+              <div class="form-row">
+                ${field("slug", "Slug (optional)", 'placeholder="auto-generated from name"', "Used in the product URL. Leave blank to generate.")}
+                ${field("sku", "SKU")}
               </div>
-              <div class="form-group checkbox-row">
-                <input type="checkbox" name="featured" id="featured">
-                <label for="featured" style="margin:0">Show on homepage (Featured)</label>
+              <div class="form-row">
+                <div class="form-group"><label for="catSelect">Category</label>
+                  <select name="category_id" id="catSelect"></select></div>
+                ${field("brand", "Brand")}
+              </div>
+              ${field("short_description", "Short description", "maxlength=300")}
+              <div class="form-group"><label for="f_description">Full description</label>
+                <textarea id="f_description" name="description"></textarea></div>
+
+              <div class="form-section-title">Specifications</div>
+              <div class="form-row">${field("material", "Material")}${field("size", "Size")}</div>
+              <div class="form-row">${field("color", "Colour")}${field("weight", "Weight")}</div>
+              <div class="form-row">${field("finish", "Finish")}${field("thickness", "Thickness")}</div>
+              <div class="form-row">${field("pieces_per_box", "Pieces per box", 'type="number" min="0" step="1"')}${field("coverage", "Coverage", 'placeholder="e.g. 1.44 sq m"')}</div>
+            </div>
+
+            <div>
+              <div class="card">
+                <h2>Pricing &amp; stock</h2>
+                <div class="form-row">
+                  ${field("price", "Price (₹) *", 'type="number" step="0.01" min="0" required')}
+                  ${field("discount_price", "Discount price (₹)", 'type="number" step="0.01" min="0"', "Leave blank for no discount.")}
+                </div>
+                <div class="form-row-3">
+                  ${field("unit", "Unit", 'placeholder="piece / box / kg"')}
+                  ${field("stock", "Stock", 'type="number" min="0" step="1" value="0"')}
+                  ${field("min_stock", "Min stock level", 'type="number" min="0" step="1" value="5"', "Low-stock alert below this.")}
+                </div>
+                <div class="stack">
+                  <label class="switch"><input type="checkbox" name="availability" id="availability" checked><span class="track"></span>Available for sale</label>
+                  <label class="switch"><input type="checkbox" name="featured" id="featured"><span class="track"></span>Show on homepage (Featured)</label>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-head"><h2>Main image</h2><span id="imgStatusBadge"></span></div>
+                <div class="main-img" id="imagePreview"></div>
+                <div class="hstack" style="margin-top:10px">
+                  <a class="btn btn-outline btn-sm" id="viewImg" target="_blank" rel="noopener" hidden>${icon("eye")}View image</a>
+                  <button type="button" class="btn btn-danger-outline btn-sm" id="clearImg" hidden>Delete image</button>
+                  ${editingId ? `<button type="button" class="btn btn-outline btn-sm" id="regenBtn">${icon("sparkles")}Generate with AI</button>` : ""}
+                </div>
+                <div class="form-group" style="margin-top:12px">
+                  <label for="imageFile">Upload image</label>
+                  <input type="file" id="imageFile" accept="image/*">
+                  <input type="hidden" name="image" id="imagePath">
+                  <div class="help">JPG, PNG or WebP. "Delete image" only clears it from this product when you save.${editingId ? "" : " AI generation is available after the product is saved."}</div>
+                </div>
+              </div>
+
+              <div class="card">
+                <h2>Additional images</h2>
+                <div class="form-group">
+                  <label for="extraFiles">Upload more images</label>
+                  <input type="file" id="extraFiles" accept="image/*" multiple>
+                  <input type="hidden" name="additional_images" id="extraPaths">
+                </div>
+                <div class="img-preview" id="extraPreview"></div>
               </div>
             </div>
+          </div>
 
-            <div style="display:flex;gap:10px;margin-top:10px">
-              <button class="btn btn-primary" type="submit">💾 Save Product</button>
-              <a class="btn btn-outline" href="products.html">Cancel</a>
-            </div>
-          </form>
-        </div>`;
+          <div class="card hstack" style="position:sticky;bottom:0;z-index:5">
+            <button class="btn btn-primary" type="submit" id="saveBtn">Save product</button>
+            <a class="btn btn-outline" href="products.html">Cancel</a>
+            <span class="muted small">* required</span>
+          </div>
+        </form>`;
 
       fillCategorySelect();
       bindImageUpload();
       bindExtraUpload();
+      renderMainImage();
+      renderExtra();
+      document.getElementById("clearImg").addEventListener("click", async () => {
+        const ok = await confirmDialog({ title: "Remove main image?", message: "The image will be removed from this product when you save.", confirmLabel: "Remove image", danger: true });
+        if (!ok) return;
+        uploadedImage = ""; imageStatus = "missing"; renderMainImage();
+      });
       const regen = document.getElementById("regenBtn");
       if (regen) regen.addEventListener("click", () => regenerateImage(editingId, regen, (d) => {
         uploadedImage = d.image || "";
-        document.getElementById("imagePath").value = uploadedImage;
-        document.getElementById("imagePreview").innerHTML =
-          uploadedImage ? `<img src="${uploadedImage}?t=${Date.now()}" style="max-width:160px;border-radius:10px">` : "";
-        document.getElementById("formAlert").innerHTML =
-          `<div class="alert alert-success">Image ${esc(d.image_status)}: ${esc(d.result.detail)}</div>`;
+        imageStatus = d.image_status || "";
+        renderMainImage(true);
       }));
 
       if (editingId) await loadProduct(editingId);
@@ -140,68 +142,73 @@
 
     function fillCategorySelect(selectedId) {
       const sel = document.getElementById("catSelect");
-      sel.innerHTML = `<option value="">— No category —</option>`;
-
-      categories.filter((c) => !c.parent_id).forEach((parent) => {
-        sel.innerHTML += `<option value="${parent.id}" ${selectedId == parent.id ? "selected" : ""}>
-            ${esc(parent.name)}
-          </option>`;
+      let html = `<option value="">— No category —</option>`;
+      categories.forEach((parent) => {
+        html += `<option value="${parent.id}" ${selectedId == parent.id ? "selected" : ""}>${esc(parent.name)}</option>`;
         (parent.children || []).forEach((child) => {
-          sel.innerHTML += `<option value="${child.id}" ${selectedId == child.id ? "selected" : ""}>
-              &nbsp;&nbsp;↳ ${esc(child.name)}
-            </option>`;
+          html += `<option value="${child.id}" ${selectedId == child.id ? "selected" : ""}>&nbsp;&nbsp;↳ ${esc(child.name)}</option>`;
         });
       });
+      sel.innerHTML = html;
+    }
+
+    function renderMainImage(bust) {
+      document.getElementById("imagePath").value = uploadedImage;
+      const src = uploadedImage ? uploadedImage + (bust ? (uploadedImage.includes("?") ? "&" : "?") + "t=" + Date.now() : "") : "";
+      document.getElementById("imagePreview").innerHTML = src
+        ? `<img src="${esc(src)}" alt="Product image preview">`
+        : `<div class="thumb-empty" style="width:160px;height:160px;font-size:.8rem">No image</div>`;
+      const view = document.getElementById("viewImg");
+      view.hidden = !uploadedImage; if (uploadedImage) view.href = uploadedImage;
+      document.getElementById("clearImg").hidden = !uploadedImage;
+      document.getElementById("imgStatusBadge").innerHTML = editingId ? imageBadge({ status: imageStatus || (uploadedImage ? "ready" : "missing") }) : "";
     }
 
     function bindImageUpload() {
       document.getElementById("imageFile").addEventListener("change", async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        const fd = new FormData();
-        fd.append("file", file);
-
-        const res = await fetch("/api/upload/products", {
-          method: "POST",
-          body: fd,
-          credentials: "same-origin",
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          uploadedImage = data.data.url;
-          document.getElementById("imagePath").value = uploadedImage;
-          document.getElementById("imagePreview").innerHTML =
-            `<img src="${uploadedImage}" style="max-width:160px;border-radius:10px">`;
-        } else {
-          alert("Upload failed: " + data.message);
+        try {
+          uploadedImage = await apiUpload("products", file);
+          imageStatus = "ready";
+          renderMainImage();
+          toast("Image uploaded — save to apply", "success");
+        } catch (err) {
+          toast("Upload failed: " + err.message, "error");
         }
+        e.target.value = "";
       });
     }
 
     function renderExtra() {
       document.getElementById("extraPaths").value = JSON.stringify(extraImages);
-      document.getElementById("extraPreview").innerHTML = extraImages.map((u, i) =>
-        `<span style="position:relative"><img src="${esc(u)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px">
-         <button type="button" onclick="removeExtra(${i})" style="position:absolute;top:-6px;right:-6px;border:0;border-radius:50%;width:20px;height:20px;cursor:pointer">×</button></span>`).join("");
+      const box = document.getElementById("extraPreview");
+      box.innerHTML = extraImages.length ? extraImages.map((u, i) => `
+        <div class="img-tile"><img src="${esc(u)}" alt="Additional image ${i + 1}" loading="lazy">
+          <div class="hstack">
+            <a class="btn btn-ghost btn-sm" href="${esc(u)}" target="_blank" rel="noopener">View</a>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="makeMain(${i})">Set main</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="removeExtra(${i})" aria-label="Remove additional image ${i + 1}">Remove</button>
+          </div></div>`).join("") : `<p class="muted small mb-0">No additional images.</p>`;
     }
 
     function removeExtra(i) { extraImages.splice(i, 1); renderExtra(); }
+    function makeMain(i) {
+      const u = extraImages[i];
+      extraImages.splice(i, 1);
+      if (uploadedImage) extraImages.unshift(uploadedImage);
+      uploadedImage = u; imageStatus = "ready";
+      renderExtra(); renderMainImage();
+    }
 
     function bindExtraUpload() {
       document.getElementById("extraFiles").addEventListener("change", async (e) => {
         for (const file of e.target.files) {
-          const fd = new FormData();
-          fd.append("file", file);
           try {
-            const res = await fetch("/api/upload/products", { method: "POST", body: fd, credentials: "same-origin" });
-            const data = await res.json();
-            if (!data.success) throw new Error(data.message);
-            extraImages.push(data.data.url);
+            extraImages.push(await apiUpload("products", file));
             renderExtra();
           } catch (err) {
-            alert("Upload failed: " + err.message);
+            toast(`Upload failed (${file.name}): ${err.message}`, "error");
           }
         }
         e.target.value = "";
@@ -210,51 +217,86 @@
 
     async function loadProduct(id) {
       try {
-        const res = await api("/products/" + id);
-        const p = res.data;
+        const p = (await api("/products/" + id)).data;
         uploadedImage = p.image || "";
+        imageStatus = p.image_status || "";
         extraImages = p.additional_images || [];
         renderExtra();
-
         const form = document.getElementById("productForm");
-        ["name","brand","sku","price","discount_price","unit","stock",
-         "short_description","description","material","size","color","weight",
-         "finish","thickness","pieces_per_box","coverage"].forEach((f) => {
-          if (form[f] !== undefined && p[f] !== null && p[f] !== undefined) {
-            form[f].value = p[f];
-          }
+        TEXT_FIELDS.forEach((f) => {
+          if (form[f] !== undefined && p[f] !== null && p[f] !== undefined) form[f].value = p[f];
         });
-
         document.getElementById("availability").checked = !!p.availability;
         document.getElementById("featured").checked = !!p.featured;
-        document.getElementById("imagePath").value = uploadedImage;
-
-        if (uploadedImage) {
-          document.getElementById("imagePreview").innerHTML =
-            `<img src="${uploadedImage}" style="max-width:160px;border-radius:10px">`;
-        }
-
+        renderMainImage();
         fillCategorySelect(p.category_id);
+        const sl = document.getElementById("slugLink");
+        if (sl) sl.innerHTML = `Slug: <b>${esc(p.slug || "—")}</b> · <a href="/product-details.html?id=${Number(p.id)}" target="_blank" rel="noopener">View on site</a>`;
+        setPageTitle("Edit: " + p.name);
       } catch (err) {
-        document.getElementById("formAlert").innerHTML =
-          `<div class="alert alert-error">${esc(err.message)}</div>`;
+        document.getElementById("formAlert").innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
       }
+    }
+
+    function clearErrors() {
+      document.querySelectorAll("[data-err]").forEach((e) => { e.hidden = true; e.textContent = ""; });
+      document.querySelectorAll(".is-invalid").forEach((e) => e.classList.remove("is-invalid"));
+    }
+    function setError(name, msg) {
+      const el = document.querySelector(`[data-err="${name}"]`);
+      const input = document.getElementById("f_" + name);
+      if (el) { el.textContent = msg; el.hidden = false; }
+      if (input) input.classList.add("is-invalid");
+    }
+
+    function validate(form) {
+      let ok = true;
+      if (!form.name.value.trim()) { setError("name", "Product name is required."); ok = false; }
+      const price = parseFloat(form.price.value);
+      if (form.price.value === "" || isNaN(price) || price < 0) { setError("price", "Enter a price of 0 or more."); ok = false; }
+      const dp = form.discount_price.value;
+      if (dp !== "" && (isNaN(parseFloat(dp)) || parseFloat(dp) < 0)) { setError("discount_price", "Enter a valid amount."); ok = false; }
+      else if (dp !== "" && !isNaN(price) && parseFloat(dp) > price) { setError("discount_price", "Discount price cannot be more than the price."); ok = false; }
+      ["stock", "min_stock", "pieces_per_box"].forEach((f) => {
+        const v = form[f].value;
+        if (v !== "" && (!/^\d+$/.test(v))) { setError(f, "Enter a whole number (0 or more)."); ok = false; }
+      });
+      if (form.slug.value && !/^[a-z0-9-]+$/i.test(form.slug.value.trim())) { setError("slug", "Use letters, numbers and hyphens only."); ok = false; }
+      return ok;
+    }
+
+    /** Map an API validation message onto a field when it names one. */
+    function showApiError(msg) {
+      const m = String(msg).toLowerCase();
+      const hit = TEXT_FIELDS.find((f) => m.includes(f.replace(/_/g, " ")) || m.includes(f));
+      if (hit) setError(hit, msg);
+      document.getElementById("formAlert").innerHTML = `<div class="alert alert-error" role="alert">${esc(msg)}</div>`;
+      toast(msg, "error");
     }
 
     async function saveProduct(e) {
       e.preventDefault();
       const form = e.target;
       const box = document.getElementById("formAlert");
+      box.innerHTML = "";
+      clearErrors();
+      if (!validate(form)) {
+        toast("Please fix the highlighted fields", "error");
+        form.querySelector(".is-invalid")?.focus();
+        return;
+      }
 
       const payload = {
         name: form.name.value.trim(),
+        slug: form.slug.value.trim(),
         brand: form.brand.value.trim(),
         sku: form.sku.value.trim(),
         category_id: form.category_id.value || null,
         price: form.price.value,
         discount_price: form.discount_price.value,
         unit: form.unit.value.trim() || "piece",
-        stock: form.stock.value,
+        stock: form.stock.value || 0,
+        min_stock: form.min_stock.value === "" ? 5 : form.min_stock.value,
         short_description: form.short_description.value,
         description: form.description.value,
         material: form.material.value,
@@ -270,24 +312,23 @@
         availability: form.availability.checked,
         featured: form.featured.checked,
       };
+      if (!payload.slug) delete payload.slug;
 
-      try {
-        if (editingId) {
-          await api("/products/" + editingId, { method: "PUT", body: JSON.stringify(payload) });
-          box.innerHTML = `<div class="alert alert-success">Product updated.</div>`;
-        } else {
-          await api("/products", { method: "POST", body: JSON.stringify(payload) });
-          box.innerHTML = `<div class="alert alert-success">Product created.</div>`;
-          form.reset();
-          document.getElementById("imagePreview").innerHTML = "";
-          uploadedImage = "";
-          extraImages = [];
-          renderExtra();
+      const btn = document.getElementById("saveBtn");
+      await withBusy(btn, async () => {
+        try {
+          if (editingId) {
+            await api("/products/" + editingId, { method: "PUT", body: JSON.stringify(payload) });
+            toast("Product updated", "success");
+          } else {
+            await api("/products", { method: "POST", body: JSON.stringify(payload) });
+            toast("Product created", "success");
+          }
+          setTimeout(() => (location.href = "products.html"), 700);
+        } catch (err) {
+          showApiError(err.message);
         }
-        setTimeout(() => (location.href = "products.html"), 800);
-      } catch (err) {
-        box.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
-      }
+      }, "Saving…");
     }
 
     init();

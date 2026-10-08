@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brands | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    let brands = [];
+    let filter = "";
+
+    async function init() {
+      const host = await renderAdminShell("brands.html", "Brands");
+      if (!host) return;
+      host.innerHTML = `
+        <div class="card">
+          <div class="card-head">
+            <div><h2>Brands</h2><p class="sub">Brands come from the Brand field on products. Rename a brand, or merge it into another by renaming it to an existing brand name.</p></div>
+          </div>
+          <div class="toolbar">
+            <label class="sr-only" for="bSearch">Search brands</label>
+            <input id="bSearch" class="search" type="search" placeholder="Search brands…">
+          </div>
+          <div id="brandTable">${loadingHTML()}</div>
+        </div>`;
+      document.getElementById("bSearch").addEventListener("input", debounce((e) => { filter = e.target.value.trim().toLowerCase(); render(); }, 150));
+      await load();
+    }
+
+    async function load() {
+      try {
+        brands = (await api("/admin/brands")).data || [];
+        render();
+      } catch (err) {
+        document.getElementById("brandTable").innerHTML = errorHTML(err.message);
+      }
+    }
+
+    function render() {
+      const box = document.getElementById("brandTable");
+      const rows = filter ? brands.filter((b) => b.brand.toLowerCase().includes(filter)) : brands;
+      if (!brands.length) { box.innerHTML = emptyHTML("No brands yet. Add a brand on a product to see it here."); return; }
+      if (!rows.length) { box.innerHTML = emptyHTML("No brands match your search."); return; }
+      box.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>Brand</th><th class="right">Products</th><th>Actions</th></tr></thead>
+        <tbody>${rows.map((b, i) => `
+          <tr>
+            <td class="cell-title">${esc(b.brand)}</td>
+            <td class="right num">${num(b.count)}</td>
+            <td><div class="row-actions">
+              <a class="btn btn-outline btn-sm" href="products.html?brand=${encodeURIComponent(b.brand)}">View products</a>
+              <button class="btn btn-outline btn-sm" data-act="rename" data-i="${brands.indexOf(b)}">Rename</button>
+              <button class="btn btn-outline btn-sm" data-act="merge" data-i="${brands.indexOf(b)}">Merge into…</button>
+              <button class="btn btn-danger-outline btn-sm" data-act="clear" data-i="${brands.indexOf(b)}">Remove brand</button>
+            </div></td>
+          </tr>`).join("")}</tbody></table></div>`;
+      box.querySelectorAll("[data-act]").forEach((btn) => btn.addEventListener("click", () => action(btn.dataset.act, brands[Number(btn.dataset.i)])));
+    }
+
+    async function apply(from, to, msg) {
+      try {
+        const res = await api("/admin/brands", { method: "PUT", body: JSON.stringify({ from, to }) });
+        toast(res.message || msg, "success");
+        await load();
+      } catch (err) { toast(err.message, "error"); }
+    }
+
+    async function action(kind, b) {
+      if (kind === "rename") {
+        const to = await promptDialog({ title: "Rename brand", label: "New brand name", value: b.brand, confirmLabel: "Rename",
+          help: `Updates ${b.count} product(s). Using an existing brand name merges them.` });
+        if (to === null || !to.trim() || to.trim() === b.brand) return;
+        return apply(b.brand, to.trim(), "Brand renamed");
+      }
+      if (kind === "merge") {
+        const others = brands.filter((x) => x.brand !== b.brand);
+        if (!others.length) { toast("There is no other brand to merge into.", "info"); return; }
+        const m = openModal({
+          title: `Merge "${b.brand}"`,
+          body: `<div class="form-group"><label for="mergeTo">Move ${num(b.count)} product(s) to brand</label>
+            <select id="mergeTo">${others.map((o) => `<option value="${esc(o.brand)}">${esc(o.brand)} (${num(o.count)})</option>`).join("")}</select>
+            <div class="help">"${esc(b.brand)}" will disappear once its products are moved.</div></div>`,
+          footer: `<button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" id="doMerge">Merge brands</button>`,
+        });
+        document.getElementById("doMerge").onclick = async () => {
+          const to = document.getElementById("mergeTo").value;
+          m.close();
+          await apply(b.brand, to, "Brands merged");
+        };
+        return;
+      }
+      if (kind === "clear") {
+        const ok = await confirmDialog({ title: "Remove brand?", message: `The brand "${b.brand}" will be cleared from ${b.count} product(s). The products themselves are kept.`, confirmLabel: "Remove brand", danger: true });
+        if (ok) await apply(b.brand, "", "Brand removed");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

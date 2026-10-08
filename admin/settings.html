@@ -4,71 +4,166 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
   <script src="js/admin.js"></script>
   <script>
-    const FIELDS = [
-      ["business_name", "Business Name"],
-      ["tagline", "Tagline"],
-      ["phone", "Phone Number"],
-      ["whatsapp", "WhatsApp Number (digits only, with country code)"],
-      ["email", "Email"],
-      ["address", "Address"],
-      ["opening_hours", "Opening Hours"],
-      ["google_maps", "Google Maps Link"],
-      ["facebook", "Facebook URL"],
-      ["instagram", "Instagram URL"],
-      ["youtube", "YouTube URL"],
-      ["twitter", "Twitter / X URL"],
-      ["footer_text", "Footer Text"],
-      ["developer_name", "Developer Name"],
+    // [key, label, type, help]   type: text | textarea | toggle | number | url | email
+    const SECTIONS = [
+      ["business", "Business information", "Shown in the navbar, footer and on invoices.", [
+        ["business_name", "Business name", "text"],
+        ["tagline", "Tagline", "text"],
+        ["footer_text", "Footer text", "textarea"],
+        ["logo", "Logo URL", "url", "Optional. Leave blank to use the business name as text."],
+        ["demo_mode", "Demo mode", "toggle", "When on, the site shows a notice that the contact details below are placeholders. Turn off once you have entered your real details."],
+      ]],
+      ["contact", "Contact", "Used for call and WhatsApp buttons, the contact page and invoices.", [
+        ["phone", "Phone number", "text"],
+        ["whatsapp", "WhatsApp number", "text", "Digits only, with country code (e.g. 919876543210)."],
+        ["email", "Email", "email"],
+        ["address", "Address", "textarea"],
+        ["city", "City", "text"],
+        ["state", "State", "text"],
+        ["opening_hours", "Opening hours", "text"],
+        ["google_maps", "Google Maps link", "url"],
+      ]],
+      ["invoice", "Invoice", "Numbering and text printed on invoices.", [
+        ["invoice_prefix", "Invoice number prefix", "text", "e.g. MHS → MHS-2026-000001"],
+        ["order_prefix", "Order number prefix", "text", "e.g. ORD → ORD-2026-000001"],
+        ["gstin", "GSTIN", "text", "Printed on invoices when set."],
+        ["invoice_footer", "Invoice footer", "textarea"],
+        ["invoice_terms", "Invoice terms", "textarea"],
+      ]],
+      ["tax", "Tax", "", [
+        ["tax_enabled", "Charge tax", "toggle"],
+        ["tax_label", "Tax label", "text", "e.g. GST"],
+        ["tax_rate", "Tax rate (%)", "number"],
+        ["tax_inclusive", "Prices already include tax", "toggle", "When on, tax is shown as included in the price instead of added on top."],
+      ]],
+      ["delivery", "Delivery", "", [
+        ["delivery_enabled", "Offer home delivery", "toggle"],
+        ["pickup_enabled", "Offer store pickup", "toggle"],
+        ["delivery_fee", "Delivery fee (₹)", "number"],
+        ["free_delivery_above", "Free delivery above (₹)", "number", "0 = no free-delivery threshold."],
+        ["delivery_note", "Delivery note", "textarea"],
+      ]],
+      ["payment", "Payment", "An online payment gateway is not configured, so customers pay by cash on delivery or manual UPI.", [
+        ["payment_cod_enabled", "Accept cash on delivery / at pickup", "toggle"],
+        ["upi_id", "UPI ID", "text", "Shown to customers for manual UPI payment when set. Leave blank to hide."],
+      ]],
+      ["ai", "AI", "", [
+        ["ai_assistant_enabled", "Show the AI shopping assistant on the website", "toggle"],
+      ]],
+      ["social", "Social links", "Leave a link empty to hide its icon on the website.", [
+        ["facebook", "Facebook URL", "url"],
+        ["instagram", "Instagram URL", "url"],
+        ["youtube", "YouTube URL", "url"],
+        ["twitter", "Twitter / X URL", "url"],
+      ]],
     ];
+    const isOn = (v) => ["1", "true", "yes", "on"].includes(String(v ?? "").trim().toLowerCase());
+
+    function fieldHTML([key, label, type, help], cur) {
+      const v = cur[key] ?? "";
+      const h = help ? `<div class="help">${esc(help)}</div>` : "";
+      if (type === "toggle") return `<div class="form-group"><label class="switch"><input type="checkbox" name="${key}" ${isOn(v) ? "checked" : ""}><span class="track"></span>${esc(label)}</label>${h}</div>`;
+      if (type === "textarea") return `<div class="form-group"><label for="s_${key}">${esc(label)}</label><textarea id="s_${key}" name="${key}" rows="3" style="min-height:70px">${esc(v)}</textarea>${h}</div>`;
+      const t = type === "number" ? `type="number" step="any" min="0"` : type === "url" ? `type="url" placeholder="https://…"` : type === "email" ? `type="email"` : `type="text"`;
+      return `<div class="form-group"><label for="s_${key}">${esc(label)}</label><input id="s_${key}" name="${key}" ${t} value="${esc(v)}">${h}</div>`;
+    }
 
     async function init() {
-      const host = await renderAdminShell("settings.html");
+      const host = await renderAdminShell("settings.html", "Settings");
       if (!host) return;
-      document.getElementById("pageTitle").textContent = "Settings";
+      host.innerHTML = loadingHTML("Loading settings…");
 
-      let current = {};
-      try {
-        const res = await api("/settings");
-        current = res.data || {};
-      } catch {}
+      let current;
+      try { current = (await api("/settings/admin")).data || {}; }
+      catch (err) { host.innerHTML = `<div class="card">${errorHTML(err.message)}</div>`; return; }
 
       host.innerHTML = `
-        <div class="card">
-          <h2>Business Settings</h2>
-          <p style="color:#6b7280;font-size:.9rem">
-            These values are used everywhere on the website — navbar, footer,
-            WhatsApp buttons and contact page. No HTML editing required.
-          </p>
-          <div id="setAlert"></div>
+        <div class="toolbar">
+          ${SECTIONS.map(([id, title]) => `<a class="btn btn-ghost btn-sm" href="#${id}">${esc(title)}</a>`).join("")}
+          <a class="btn btn-ghost btn-sm" href="#password">Admin password</a>
+        </div>
+        <form id="setForm" novalidate>
+          ${SECTIONS.map(([id, title, sub, fields]) => {
+            const half = fields.filter((f) => f[2] !== "textarea" && f[2] !== "toggle");
+            return `<div class="card anchor-offset" id="${id}">
+              <div class="card-head"><div><h2>${esc(title)}</h2>${sub ? `<p class="sub">${esc(sub)}</p>` : ""}</div></div>
+              ${half.length > 1 ? `<div class="form-row">${half.map((f) => fieldHTML(f, current)).join("")}</div>` : half.map((f) => fieldHTML(f, current)).join("")}
+              ${fields.filter((f) => f[2] === "textarea" || f[2] === "toggle").map((f) => fieldHTML(f, current)).join("")}
+            </div>`;
+          }).join("")}
+          <div class="card hstack" style="position:sticky;bottom:0;z-index:5">
+            <button class="btn btn-primary" type="submit" id="saveSettings">Save settings</button>
+            <span class="muted small">Changes apply to the website immediately after saving.</span>
+          </div>
+        </form>
 
-          <form id="setForm">
-            ${FIELDS.map(([key, label]) => `
-              <div class="form-group">
-                <label>${label}</label>
-                <input name="${key}" value="${esc(current[key] || "")}">
-              </div>`).join("")}
-
-            <button class="btn btn-primary" type="submit">💾 Save Settings</button>
+        <div class="card anchor-offset" id="password">
+          <div class="card-head"><div><h2>Change admin password</h2><p class="sub">Use at least 8 characters. You stay signed in after changing it.</p></div></div>
+          <form id="pwForm" novalidate style="max-width:520px">
+            <div class="form-group"><label for="curPw">Current password</label><input id="curPw" type="password" autocomplete="current-password" required></div>
+            <div class="form-row">
+              <div class="form-group"><label for="newPw">New password</label><input id="newPw" type="password" autocomplete="new-password" minlength="8" required></div>
+              <div class="form-group"><label for="newPw2">Confirm new password</label><input id="newPw2" type="password" autocomplete="new-password" required></div>
+            </div>
+            <div class="field-error" id="pwErr" hidden></div>
+            <button class="btn btn-primary" type="submit" id="pwBtn">Change password</button>
           </form>
         </div>`;
 
       document.getElementById("setForm").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const box = document.getElementById("setAlert");
-        const payload = Object.fromEntries(new FormData(e.target).entries());
-        try {
-          await api("/settings", { method: "PUT", body: JSON.stringify(payload) });
-          box.innerHTML = `<div class="alert alert-success">Settings saved.</div>`;
-          window.__settings = payload;
-        } catch (err) {
-          box.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
-        }
+        const form = e.target;
+        const payload = {};
+        let bad = null;
+        SECTIONS.forEach(([, , , fields]) => fields.forEach(([key, label, type]) => {
+          const el = form.elements[key];
+          if (type === "toggle") payload[key] = el.checked ? "1" : "0";
+          else {
+            const v = el.value.trim();
+            el.classList.remove("is-invalid");
+            if (type === "number" && v !== "" && (isNaN(Number(v)) || Number(v) < 0)) { el.classList.add("is-invalid"); bad = bad || [el, `${label} must be a number of 0 or more.`]; }
+            if (type === "url" && v && !/^(https?:\/\/|\/)/i.test(v)) { el.classList.add("is-invalid"); bad = bad || [el, `${label} must start with https://`]; }
+            if (key === "whatsapp" && v && !/^\d{10,15}$/.test(v)) { el.classList.add("is-invalid"); bad = bad || [el, "WhatsApp number must be 10–15 digits, no spaces or +."]; }
+            payload[key] = v;
+          }
+        }));
+        if (bad) { toast(bad[1], "error"); bad[0].focus(); return; }
+        await withBusy(document.getElementById("saveSettings"), async () => {
+          try {
+            const res = await api("/settings", { method: "PUT", body: JSON.stringify(payload) });
+            toast(res.message || "Settings saved", "success");
+          } catch (err) { toast(err.message, "error"); }
+        }, "Saving…");
       });
+
+      document.getElementById("pwForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const err = document.getElementById("pwErr");
+        const cur = document.getElementById("curPw").value, n1 = document.getElementById("newPw").value, n2 = document.getElementById("newPw2").value;
+        const show = (m) => { err.textContent = m; err.hidden = !m; };
+        if (!cur) return show("Enter your current password.");
+        if (n1.length < 8) return show("New password must be at least 8 characters.");
+        if (n1 !== n2) return show("The new passwords do not match.");
+        show("");
+        await withBusy(document.getElementById("pwBtn"), async () => {
+          try {
+            const res = await api("/auth/password", { method: "POST", body: JSON.stringify({ current_password: cur, new_password: n1 }) });
+            toast(res.message || "Password changed", "success");
+            e.target.reset();
+            document.querySelector(".pw-banner")?.remove();
+          } catch (ex) { show(ex.message); toast(ex.message, "error"); }
+        }, "Saving…");
+      });
+
+      if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
     }
 
     init();

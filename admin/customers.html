@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customers | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    const state = { page: Number(qsGet("page")) || 1, q: qsGet("q") || "", type: qsGet("type") || "" };
+    let rows = [];
+
+    async function init() {
+      const host = await renderAdminShell("customers.html", "Customers");
+      if (!host) return;
+      host.innerHTML = `
+        <div class="card">
+          <div class="card-head"><div><h2>Customers</h2><p class="sub" id="countNote">&nbsp;</p></div></div>
+          <div class="toolbar" role="search">
+            <label class="sr-only" for="cSearch">Search customers</label>
+            <input id="cSearch" class="search" type="search" placeholder="Name, phone or email…" value="${esc(state.q)}">
+            <label class="sr-only" for="cType">Customer type</label>
+            <select id="cType">${optionList([["registered", "Registered"], ["guest", "Guest"]], state.type, "All customers")}</select>
+          </div>
+          <div id="custBox">${loadingHTML("Loading customers…")}</div>
+          <div id="pager"></div>
+        </div>`;
+      const reload = () => { state.page = 1; load(); };
+      document.getElementById("cSearch").addEventListener("input", debounce((e) => { state.q = e.target.value.trim(); reload(); }, 350));
+      document.getElementById("cType").addEventListener("change", (e) => { state.type = e.target.value; reload(); });
+      await load();
+      const open = Number(qsGet("open"));
+      if (open) openCustomer(open);
+    }
+
+    async function load() {
+      setQuery({ q: state.q, type: state.type, page: state.page > 1 ? state.page : "" });
+      const box = document.getElementById("custBox");
+      const p = new URLSearchParams({ page: state.page, limit: 50 });
+      if (state.q) p.set("q", state.q);
+      if (state.type) p.set("type", state.type);
+      try {
+        const res = await api("/admin/customers?" + p);
+        rows = res.data || [];
+        const meta = res.meta || { page: 1, pages: 1, total: rows.length, limit: 50 };
+        document.getElementById("countNote").textContent = `${num(meta.total)} customer${meta.total === 1 ? "" : "s"}`;
+        if (!rows.length) {
+          box.innerHTML = emptyHTML(state.q || state.type ? "No customers match these filters." : "No customers yet.");
+          renderPager(document.getElementById("pager"), null);
+          return;
+        }
+        box.innerHTML = `<div class="table-wrap"><table>
+          <thead><tr><th>Customer</th><th>Phone</th><th>Email</th><th class="right">Orders</th><th class="right">Total spending</th>
+            <th>Last order</th><th>Type</th><th>Status</th><th></th></tr></thead>
+          <tbody>${rows.map((c) => `
+            <tr>
+              <td><button class="btn btn-ghost btn-sm cell-title" style="padding:2px 0" onclick="openCustomer(${Number(c.id)})">${esc(c.name || "Unnamed")}</button>
+                <div class="cell-sub">Since ${esc(fmtDate(c.created_at))}</div></td>
+              <td class="nowrap">${esc(c.phone || "—")}</td>
+              <td>${esc(c.email || "—")}</td>
+              <td class="right num">${num(c.order_count)}</td>
+              <td class="right num nowrap">${money(c.total_spent)}</td>
+              <td class="nowrap">${c.last_order_at ? esc(fmtDate(c.last_order_at)) : `<span class="muted">—</span>`}</td>
+              <td>${c.is_registered ? `<span class="badge badge-blue">Registered</span>` : `<span class="badge badge-grey">Guest</span>`}</td>
+              <td><label class="switch small"><input type="checkbox" ${c.is_active ? "checked" : ""} onchange="toggleActive(${Number(c.id)}, this)" aria-label="Active: ${esc(c.name)}"><span class="track"></span><span>${c.is_active ? "Active" : "Disabled"}</span></label></td>
+              <td><button class="btn btn-outline btn-sm" onclick="openCustomer(${Number(c.id)})">View</button></td>
+            </tr>`).join("")}</tbody></table></div>`;
+        renderPager(document.getElementById("pager"), meta, (pg) => { state.page = pg; load(); window.scrollTo({ top: 0 }); });
+      } catch (err) {
+        box.innerHTML = errorHTML(err.message);
+      }
+    }
+
+    async function toggleActive(id, cb) {
+      const c = rows.find((r) => r.id === id);
+      if (!cb.checked) {
+        const ok = await confirmDialog({ title: "Disable customer?", message: `${c ? c.name : "This customer"} will not be able to sign in to their account until re-enabled.`, confirmLabel: "Disable", danger: true });
+        if (!ok) { cb.checked = true; return; }
+      }
+      cb.disabled = true;
+      try {
+        await api("/admin/customers/" + id, { method: "PUT", body: JSON.stringify({ is_active: cb.checked }) });
+        if (c) c.is_active = cb.checked;
+        cb.parentElement.querySelector("span:last-child").textContent = cb.checked ? "Active" : "Disabled";
+        toast(cb.checked ? "Customer enabled" : "Customer disabled", "success");
+      } catch (err) { cb.checked = !cb.checked; toast(err.message, "error"); }
+      cb.disabled = false;
+    }
+
+    async function openCustomer(id) {
+      const m = openModal({ title: "Customer", drawer: true, body: loadingHTML(), onClose: () => setQuery({ open: "" }) });
+      setQuery({ open: id });
+      let c;
+      try { c = (await api("/admin/customers/" + id)).data; }
+      catch (err) { m.body.innerHTML = errorHTML(err.message); return; }
+      m.el.querySelector(".modal-head h2").textContent = c.name || "Customer";
+      const orders = c.orders || [];
+      const spent = orders.filter((o) => o.status !== "cancelled").reduce((s, o) => s + (Number(o.grand_total) || 0), 0);
+      m.body.innerHTML = `
+        <div class="hstack" style="margin-bottom:12px">
+          ${c.is_registered ? `<span class="badge badge-blue">Registered</span>` : `<span class="badge badge-grey">Guest</span>`}
+          ${c.is_active ? `<span class="badge badge-green">Active</span>` : `<span class="badge badge-red">Disabled</span>`}
+        </div>
+        <dl class="kv">
+          <dt>Phone</dt><dd>${c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : "—"}</dd>
+          <dt>WhatsApp</dt><dd>${c.whatsapp || c.phone ? `<a href="https://wa.me/${waNumber(c.whatsapp || c.phone)}" target="_blank" rel="noopener">${esc(c.whatsapp || c.phone)}</a>` : "—"}</dd>
+          <dt>Email</dt><dd>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "—"}</dd>
+          <dt>Address</dt><dd>${esc(c.address || "—")}</dd>
+          <dt>Customer since</dt><dd>${esc(fmtDate(c.created_at))}</dd>
+          <dt>Orders</dt><dd>${num(orders.length)} · ${money(spent)} spent</dd>
+        </dl>
+        ${c.is_registered ? `
+          <div class="form-section-title">Password reset</div>
+          <p class="small muted mt-0">Create a one-time link (valid 24 hours) and send it to the customer privately.</p>
+          <button class="btn btn-outline btn-sm" id="resetBtn">Create password reset link</button>
+          <div id="resetOut" style="margin-top:10px"></div>` : ""}
+        <div class="form-section-title">Orders</div>
+        ${orders.length ? `<div class="table-wrap"><table>
+          <thead><tr><th>Order</th><th>Date</th><th class="right">Total</th><th>Status</th></tr></thead>
+          <tbody>${orders.map((o) => `<tr>
+            <td><a class="cell-title" href="order-detail.html?id=${Number(o.id)}">${esc(o.order_number || "#" + o.id)}</a></td>
+            <td class="nowrap">${esc(fmtDate(o.created_at))}</td>
+            <td class="right num nowrap">${money(o.grand_total)}</td>
+            <td>${statusBadge(o.status, o.status_label)}</td></tr>`).join("")}</tbody></table></div>`
+          : emptyHTML("No orders yet.")}`;
+      const rb = document.getElementById("resetBtn");
+      if (rb) rb.addEventListener("click", () => withBusy(rb, async () => {
+        try {
+          const res = await api(`/admin/customers/${id}/reset-link`, { method: "POST" });
+          const d = res.data;
+          const msg = `Hello ${d.name || ""}, use this link to set a new password for your M Hardware & Sanitary account (valid 24 hours): ${d.link}`;
+          document.getElementById("resetOut").innerHTML = `
+            <div class="alert alert-info">${esc(res.message || "Reset link created.")}</div>
+            <div class="copy-field"><label class="sr-only" for="resetLink">Reset link</label>
+              <input id="resetLink" readonly value="${esc(d.link)}">
+              <button class="btn btn-outline btn-sm" id="copyLink">${icon("copy")}Copy</button></div>
+            ${d.phone ? `<a class="btn btn-primary btn-sm" style="margin-top:8px" target="_blank" rel="noopener"
+              href="https://wa.me/${waNumber(d.phone)}?text=${encodeURIComponent(msg)}">Send on WhatsApp</a>` : ""}`;
+          document.getElementById("copyLink").onclick = (e) => copyText(d.link, e.currentTarget);
+        } catch (err) { toast(err.message, "error"); }
+      }, "Creating…"));
+    }
+
+    init();
+  </script>
+</body>
+</html>

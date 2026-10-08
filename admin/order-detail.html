@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    const orderId = Number(qsGet("id"));
+    let order = null;
+    let host;
+
+    async function init() {
+      host = await renderAdminShell("orders.html", "Order details");
+      if (!host) return;
+      if (!orderId) { host.innerHTML = `<div class="card">${emptyHTML("No order selected.")}<p class="right mb-0"><a class="btn btn-outline" href="orders.html">Back to orders</a></p></div>`; return; }
+      host.innerHTML = loadingHTML("Loading order…");
+      await load();
+    }
+
+    async function load() {
+      try {
+        order = (await api("/orders/" + orderId)).data;
+        render();
+      } catch (err) {
+        host.innerHTML = `<div class="card">${errorHTML(err.message)}<p class="right mb-0"><a class="btn btn-outline" href="orders.html">Back to orders</a></p></div>`;
+      }
+    }
+
+    function render() {
+      const o = order;
+      const s = o.shipping || {};
+      const c = o.customer || {};
+      const inv = o.invoice_number ? encodeURIComponent(o.invoice_number) : "";
+      const cancelled = o.status === "cancelled";
+      setPageTitle("Order " + (o.order_number || "#" + o.id));
+      const addr = [s.address, s.city, s.state, s.pincode].filter(Boolean).join(", ");
+
+      host.innerHTML = `
+        <div class="hstack" style="margin-bottom:14px">
+          <a class="btn btn-ghost btn-sm" href="orders.html">← Back to orders</a>
+          <span class="spacer"></span>
+          ${statusBadge(o.status, o.status_label)} ${paymentBadge(o.payment_status)}
+          <span class="muted small">Placed ${esc(fmtDateTime(o.created_at))}</span>
+        </div>
+
+        <div class="grid-2 grid-side-r">
+          <div>
+            <div class="card">
+              <div class="card-head"><h2>Items <span class="muted small" style="font-weight:500">${num((o.items || []).length)} line(s) · ${num(o.item_count ?? 0)} unit(s)</span></h2>
+                ${inv ? `<div class="hstack">
+                  <a class="btn btn-outline btn-sm" href="/invoice/${inv}?print=1" target="_blank" rel="noopener">${icon("printer")}Print invoice</a>
+                  <a class="btn btn-outline btn-sm" href="/invoice/${inv}/pdf" target="_blank" rel="noopener">${icon("download")}Download invoice</a>
+                </div>` : ""}</div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>Product</th><th>SKU</th><th class="right">Qty</th><th class="right">Unit price</th><th class="right">Discount</th><th class="right">Subtotal</th></tr></thead>
+                <tbody>${(o.items || []).map((it) => `
+                  <tr>
+                    <td><div class="hstack" style="flex-wrap:nowrap">
+                      ${it.image ? `<img class="thumb" src="${esc(it.image)}" alt="" loading="lazy">` : `<span class="thumb-empty">None</span>`}
+                      <div><div class="cell-title">${it.product_id ? `<a href="product-form.html?id=${Number(it.product_id)}">${esc(it.product_name)}</a>` : esc(it.product_name)}</div>
+                      <div class="cell-sub">${esc(it.unit || "")}${it.mrp && it.mrp !== it.price ? ` · MRP ${money(it.mrp)}` : ""}</div></div></div></td>
+                    <td>${esc(it.sku || "—")}</td>
+                    <td class="right num">${num(it.quantity)}</td>
+                    <td class="right num nowrap">${money(it.price)}</td>
+                    <td class="right num nowrap">${it.discount ? money(it.discount) : "—"}</td>
+                    <td class="right num nowrap"><b>${money(it.subtotal)}</b></td>
+                  </tr>`).join("") || `<tr><td colspan="6">${emptyHTML("No items on this order.")}</td></tr>`}</tbody>
+              </table></div>
+              <div class="totals">
+                <div class="row"><span>Subtotal</span><span class="num">${money(o.subtotal)}</span></div>
+                ${o.discount ? `<div class="row"><span>Discount</span><span class="num">− ${money(o.discount)}</span></div>` : ""}
+                ${o.tax ? `<div class="row"><span>Tax</span><span class="num">${money(o.tax)}</span></div>` : ""}
+                <div class="row"><span>Delivery</span><span class="num">${o.delivery_fee ? money(o.delivery_fee) : "Free"}</span></div>
+                <div class="row grand"><span>Grand total</span><span class="num">${money(o.grand_total)}</span></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2>Status timeline</h2>
+              ${(o.history || []).length ? `<ol class="timeline">${o.history.slice().reverse().map((h) => `
+                <li><div class="t-title">${esc(h.label || statusLabel(h.status))}</div>
+                  <div class="t-meta">${esc(fmtDateTime(h.created_at))}</div>
+                  ${h.note ? `<div class="small">${esc(h.note)}</div>` : ""}</li>`).join("")}</ol>` : emptyHTML("No status history yet.")}
+            </div>
+          </div>
+
+          <div>
+            <div class="card">
+              <h2>Manage order</h2>
+              <div class="form-group"><label for="newStatus">Update status</label>
+                <select id="newStatus" ${cancelled ? "disabled" : ""}>${optionList(ORDER_STATUSES, o.status)}</select></div>
+              <div class="form-group"><label for="statusNote">Note for the timeline (optional)</label>
+                <input id="statusNote" placeholder="e.g. Dispatched with Ramesh" ${cancelled ? "disabled" : ""}></div>
+              <button class="btn btn-primary" id="saveStatus" ${cancelled ? "disabled" : ""}>Update status</button>
+              ${cancelled ? `<p class="help">This order is cancelled and cannot be reopened.</p>` : ""}
+
+              <div class="form-section-title">Payment</div>
+              <div class="form-group"><label for="newPay">Update payment status</label>
+                <select id="newPay">${optionList(PAYMENT_STATUSES, o.payment_status)}</select></div>
+              <button class="btn btn-outline" id="savePay">Update payment status</button>
+
+              ${cancelled ? "" : `<div class="form-section-title">Danger zone</div>
+                <button class="btn btn-danger-outline" id="cancelOrder">Cancel order</button>
+                <p class="help">Cancelling returns the items to stock.</p>`}
+            </div>
+
+            <div class="card">
+              <h2>Customer &amp; ${o.order_type === "pickup" ? "pickup" : "shipping"}</h2>
+              <dl class="kv">
+                <dt>Name</dt><dd>${esc(s.name || c.name || "—")}</dd>
+                <dt>Phone</dt><dd>${s.phone ? `<a href="tel:${esc(s.phone)}">${esc(s.phone)}</a> · <a href="https://wa.me/${waNumber(s.phone)}" target="_blank" rel="noopener">WhatsApp</a>` : "—"}</dd>
+                <dt>Email</dt><dd>${s.email ? `<a href="mailto:${esc(s.email)}">${esc(s.email)}</a>` : "—"}</dd>
+                <dt>Address</dt><dd>${esc(addr || "—")}</dd>
+                <dt>Account</dt><dd>${c.id ? `<a href="customers.html?open=${Number(c.id)}">${c.is_registered ? "Registered customer" : "Guest"}</a>` : "—"}</dd>
+              </dl>
+            </div>
+
+            <div class="card">
+              <h2>Order info</h2>
+              <dl class="kv">
+                <dt>Order type</dt><dd>${o.order_type === "pickup" ? "Store pickup" : "Home delivery"}</dd>
+                <dt>Payment method</dt><dd>${esc(PAYMENT_METHODS[o.payment_method] || o.payment_method || "—")}</dd>
+                <dt>Payment status</dt><dd>${paymentBadge(o.payment_status)}</dd>
+                <dt>Invoice</dt><dd>${esc(o.invoice_number || "—")}</dd>
+                <dt>Last updated</dt><dd>${esc(fmtDateTime(o.updated_at))}</dd>
+              </dl>
+              <div class="form-section-title">Customer note</div>
+              <p class="mt-0 mb-0">${o.note ? esc(o.note) : `<span class="muted">No note from the customer.</span>`}</p>
+            </div>
+
+            <div class="card">
+              <h2>Admin note</h2>
+              <div class="form-group"><label for="adminNote" class="sr-only">Admin note</label>
+                <textarea id="adminNote" placeholder="Private note — not shown to the customer">${esc(o.admin_note || "")}</textarea></div>
+              <button class="btn btn-outline" id="saveNote">Save note</button>
+            </div>
+          </div>
+        </div>`;
+
+      const sBtn = document.getElementById("saveStatus");
+      sBtn.addEventListener("click", () => {
+        const status = document.getElementById("newStatus").value;
+        if (status === o.status) { toast("Choose a different status first.", "info"); return; }
+        if (status === "cancelled") return cancelOrder();
+        update({ status, status_note: document.getElementById("statusNote").value.trim() || undefined }, sBtn, "Status updated");
+      });
+      const pBtn = document.getElementById("savePay");
+      pBtn.addEventListener("click", () => {
+        const payment_status = document.getElementById("newPay").value;
+        if (payment_status === o.payment_status) { toast("Payment status is unchanged.", "info"); return; }
+        update({ payment_status }, pBtn, "Payment status updated");
+      });
+      const nBtn = document.getElementById("saveNote");
+      nBtn.addEventListener("click", () => update({ admin_note: document.getElementById("adminNote").value }, nBtn, "Admin note saved"));
+      const cBtn = document.getElementById("cancelOrder");
+      if (cBtn) cBtn.addEventListener("click", cancelOrder);
+    }
+
+    async function cancelOrder() {
+      const ok = await confirmDialog({
+        title: "Cancel this order?",
+        message: `Order ${order.order_number} will be cancelled and its items returned to stock. A cancelled order cannot be reopened.`,
+        confirmLabel: "Cancel order", danger: true,
+      });
+      if (!ok) { document.getElementById("newStatus").value = order.status; return; }
+      await update({ status: "cancelled", status_note: document.getElementById("statusNote").value.trim() || "Cancelled by admin" }, document.getElementById("cancelOrder"), "Order cancelled");
+    }
+
+    async function update(body, btn, okMsg) {
+      await withBusy(btn, async () => {
+        try {
+          const res = await api("/orders/" + orderId, { method: "PUT", body: JSON.stringify(body) });
+          order = res.data;
+          toast(okMsg, "success");
+          render();
+        } catch (err) {
+          toast(err.message, "error", 7000);
+          const sel = document.getElementById("newStatus");
+          if (sel && body.status) sel.value = order.status;
+        }
+      }, "Saving…");
+    }
+
+    init();
+  </script>
+</body>
+</html>

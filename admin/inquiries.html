@@ -4,93 +4,98 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inquiries | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
   <script src="js/admin.js"></script>
   <script>
-    async function init() {
-      const host = await renderAdminShell("inquiries.html");
-      if (!host) return;
-      document.getElementById("pageTitle").textContent = "Inquiries & Messages";
+    const INQ_STATUSES = [["new", "New"], ["contacted", "Contacted"], ["closed", "Closed"]];
 
+    async function init() {
+      const host = await renderAdminShell("inquiries.html", "Inquiries & messages");
+      if (!host) return;
       host.innerHTML = `
         <div class="card">
-          <h2>Product Inquiries</h2>
-          <div id="inqBox"><p class="loading">Loading…</p></div>
+          <div class="card-head"><div><h2>Product inquiries</h2><p class="sub">Requests sent from product pages</p></div></div>
+          <div id="inqBox">${loadingHTML()}</div>
         </div>
         <div class="card">
-          <h2>Contact Messages</h2>
-          <div id="msgBox"><p class="loading">Loading…</p></div>
+          <div class="card-head"><div><h2>Contact messages</h2><p class="sub">Sent from the contact page</p></div></div>
+          <div id="msgBox">${loadingHTML()}</div>
         </div>`;
+      loadInquiries();
+      loadMessages();
+    }
 
-      try {
-        const res = await api("/inquiries");
-        const rows = res.data || [];
-        document.getElementById("inqBox").innerHTML = rows.length ? `
-          <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Phone</th><th>Product</th><th>Qty</th>
-                       <th>Message</th><th>Status</th><th></th></tr></thead>
-            <tbody>
-              ${rows.map((i) => `
-                <tr>
-                  <td>${esc(i.name)}</td>
-                  <td>${esc(i.phone || "—")}</td>
-                  <td>${esc(i.product_name || "—")}</td>
-                  <td>${esc(i.quantity || "—")}</td>
-                  <td style="max-width:260px">${esc(i.message || "—")}</td>
-                  <td>
-                    <select onchange="setInquiryStatus(${i.id}, this.value)"
-                      style="padding:5px;border-radius:6px;border:1px solid #e5e7eb">
-                      ${["new","contacted","closed"].map((s) =>
-                        `<option value="${s}" ${i.status === s ? "selected" : ""}>${s}</option>`
-                      ).join("")}
-                    </select>
-                  </td>
-                  <td><button class="btn btn-sm btn-danger" onclick="delInquiry(${i.id})">✕</button></td>
-                </tr>`).join("")}
-            </tbody>
-          </table></div>` : `<p class="empty">No inquiries yet.</p>`;
-      } catch (err) {
-        document.getElementById("inqBox").innerHTML = `<p class="empty">${esc(err.message)}</p>`;
-      }
+    const waLink = (phone) => phone ? ` · <a href="https://wa.me/${waNumber(phone)}" target="_blank" rel="noopener">WhatsApp</a>` : "";
 
+    async function loadInquiries() {
+      const box = document.getElementById("inqBox");
       try {
-        const res = await api("/contact");
-        const rows = res.data || [];
-        document.getElementById("msgBox").innerHTML = rows.length ? `
+        const rows = (await api("/inquiries")).data || [];
+        box.innerHTML = rows.length ? `
           <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Message</th><th></th></tr></thead>
-            <tbody>
-              ${rows.map((m) => `
-                <tr>
-                  <td>${esc(m.name)}</td>
-                  <td>${esc(m.phone || "—")}</td>
-                  <td>${esc(m.email || "—")}</td>
-                  <td style="max-width:340px">${esc(m.message)}</td>
-                  <td><button class="btn btn-sm btn-danger" onclick="delMessage(${m.id})">✕</button></td>
-                </tr>`).join("")}
-            </tbody>
-          </table></div>` : `<p class="empty">No messages yet.</p>`;
+            <thead><tr><th>Name</th><th>Phone</th><th>Product</th><th class="right">Qty</th><th>Message</th><th>Date</th><th>Status</th><th></th></tr></thead>
+            <tbody>${rows.map((i) => `
+              <tr>
+                <td class="cell-title">${esc(i.name)}</td>
+                <td class="nowrap">${i.phone ? `<a href="tel:${esc(i.phone)}">${esc(i.phone)}</a>${waLink(i.phone)}` : "—"}</td>
+                <td>${esc(i.product_name || "—")}</td>
+                <td class="right num">${esc(i.quantity || "—")}</td>
+                <td style="min-width:200px;max-width:320px">${esc(i.message || "—")}</td>
+                <td class="nowrap">${esc(fmtDate(i.created_at))}</td>
+                <td><label class="sr-only" for="is${i.id}">Status</label>
+                  <select id="is${i.id}" class="input-sm" style="width:auto" onchange="setInquiryStatus(${Number(i.id)}, this)">${optionList(INQ_STATUSES, i.status)}</select></td>
+                <td><button class="btn btn-danger-outline btn-sm" onclick="delInquiry(${Number(i.id)})" aria-label="Delete inquiry from ${esc(i.name)}">Delete</button></td>
+              </tr>`).join("")}</tbody>
+          </table></div>` : emptyHTML("No inquiries yet.");
       } catch (err) {
-        document.getElementById("msgBox").innerHTML = `<p class="empty">${esc(err.message)}</p>`;
+        box.innerHTML = errorHTML(err.message);
       }
     }
 
-    async function setInquiryStatus(id, status) {
+    async function loadMessages() {
+      const box = document.getElementById("msgBox");
       try {
-        await api("/inquiries/" + id, { method: "PUT", body: JSON.stringify({ status }) });
-      } catch (err) { alert(err.message); }
+        const rows = (await api("/contact")).data || [];
+        box.innerHTML = rows.length ? `
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Message</th><th>Date</th><th></th></tr></thead>
+            <tbody>${rows.map((m) => `
+              <tr>
+                <td class="cell-title">${esc(m.name)}</td>
+                <td class="nowrap">${m.phone ? `<a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>${waLink(m.phone)}` : "—"}</td>
+                <td>${m.email ? `<a href="mailto:${esc(m.email)}">${esc(m.email)}</a>` : "—"}</td>
+                <td style="min-width:220px;max-width:380px">${esc(m.message)}</td>
+                <td class="nowrap">${esc(fmtDate(m.created_at))}</td>
+                <td><button class="btn btn-danger-outline btn-sm" onclick="delMessage(${Number(m.id)})" aria-label="Delete message from ${esc(m.name)}">Delete</button></td>
+              </tr>`).join("")}</tbody>
+          </table></div>` : emptyHTML("No messages yet.");
+      } catch (err) {
+        box.innerHTML = errorHTML(err.message);
+      }
+    }
+
+    async function setInquiryStatus(id, sel) {
+      sel.disabled = true;
+      try {
+        await api("/inquiries/" + id, { method: "PUT", body: JSON.stringify({ status: sel.value }) });
+        toast("Inquiry marked " + sel.value, "success", 2500);
+      } catch (err) { toast(err.message, "error"); }
+      sel.disabled = false;
     }
     async function delInquiry(id) {
-      if (!confirm("Delete this inquiry?")) return;
-      await api("/inquiries/" + id, { method: "DELETE" });
-      init();
+      if (!(await confirmDialog({ title: "Delete inquiry?", message: "This inquiry will be permanently deleted.", confirmLabel: "Delete", danger: true }))) return;
+      try { await api("/inquiries/" + id, { method: "DELETE" }); toast("Inquiry deleted", "success"); loadInquiries(); }
+      catch (err) { toast(err.message, "error"); }
     }
     async function delMessage(id) {
-      if (!confirm("Delete this message?")) return;
-      await api("/contact/" + id, { method: "DELETE" });
-      init();
+      if (!(await confirmDialog({ title: "Delete message?", message: "This message will be permanently deleted.", confirmLabel: "Delete", danger: true }))) return;
+      try { await api("/contact/" + id, { method: "DELETE" }); toast("Message deleted", "success"); loadMessages(); }
+      catch (err) { toast(err.message, "error"); }
     }
 
     init();

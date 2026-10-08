@@ -4,66 +4,94 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Orders | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
   <script src="js/admin.js"></script>
   <script>
+    const state = {
+      page: Number(qsGet("page")) || 1,
+      status: qsGet("status") || "",
+      payment_status: qsGet("payment_status") || "",
+      q: qsGet("q") || "",
+    };
+
     async function init() {
-      const host = await renderAdminShell("orders.html");
+      const host = await renderAdminShell("orders.html", "Orders");
       if (!host) return;
-      document.getElementById("pageTitle").textContent = "Orders";
 
-      host.innerHTML = `<div class="card"><div id="ordersBox">
-        <p class="loading">Loading orders…</p></div></div>`;
+      host.innerHTML = `
+        <div class="card">
+          <div class="card-head"><div><h2>Orders</h2><p class="sub" id="countNote">&nbsp;</p></div></div>
+          <div class="toolbar" role="search">
+            <label class="sr-only" for="oSearch">Search orders</label>
+            <input id="oSearch" class="search" type="search" placeholder="Order no., customer name or phone…" value="${esc(state.q)}">
+            <label class="sr-only" for="oStatus">Order status</label>
+            <select id="oStatus">${optionList(ORDER_STATUSES, state.status, "All statuses")}</select>
+            <label class="sr-only" for="oPay">Payment status</label>
+            <select id="oPay">${optionList(PAYMENT_STATUSES, state.payment_status, "All payments")}</select>
+          </div>
+          <div id="ordersBox">${loadingHTML("Loading orders…")}</div>
+          <div id="pager"></div>
+        </div>`;
 
-      try {
-        const res = await api("/orders");
-        const orders = res.data || [];
-
-        if (!orders.length) {
-          document.getElementById("ordersBox").innerHTML =
-            `<p class="empty">No orders yet.</p>`;
-          return;
-        }
-
-        document.getElementById("ordersBox").innerHTML = `
-          <div class="table-wrap"><table>
-            <thead>
-              <tr><th>#</th><th>Customer</th><th>Phone</th><th>Items</th>
-                  <th>Total</th><th>Status</th><th>Date</th></tr>
-            </thead>
-            <tbody>
-              ${orders.map((o) => `
-                <tr>
-                  <td>#${o.id}</td>
-                  <td>${esc(o.customer ? o.customer.name : "—")}</td>
-                  <td>${esc(o.customer ? o.customer.phone : "—")}</td>
-                  <td>${o.items.length} item(s)</td>
-                  <td>${money(o.total)}</td>
-                  <td>
-                    <select onchange="updateStatus(${o.id}, this.value)"
-                      style="padding:5px;border-radius:6px;border:1px solid #e5e7eb">
-                      ${["new","quoted","confirmed","done","cancelled"].map((s) =>
-                        `<option value="${s}" ${o.status === s ? "selected" : ""}>${s}</option>`
-                      ).join("")}
-                    </select>
-                  </td>
-                  <td>${new Date(o.created_at).toLocaleDateString()}</td>
-                </tr>`).join("")}
-            </tbody>
-          </table></div>`;
-      } catch (err) {
-        document.getElementById("ordersBox").innerHTML =
-          `<p class="empty">${esc(err.message)}</p>`;
-      }
+      const reload = () => { state.page = 1; load(); };
+      document.getElementById("oSearch").addEventListener("input", debounce((e) => { state.q = e.target.value.trim(); reload(); }, 350));
+      document.getElementById("oStatus").addEventListener("change", (e) => { state.status = e.target.value; reload(); });
+      document.getElementById("oPay").addEventListener("change", (e) => { state.payment_status = e.target.value; reload(); });
+      await load();
     }
 
-    async function updateStatus(id, status) {
+    async function load() {
+      setQuery({ q: state.q, status: state.status, payment_status: state.payment_status, page: state.page > 1 ? state.page : "" });
+      const box = document.getElementById("ordersBox");
+      const p = new URLSearchParams({ page: state.page, limit: 25 });
+      ["q", "status", "payment_status"].forEach((k) => state[k] && p.set(k, state[k]));
       try {
-        await api("/orders/" + id, { method: "PUT", body: JSON.stringify({ status }) });
+        const res = await api("/orders?" + p);
+        const orders = res.data || [];
+        const meta = res.meta || { page: 1, pages: 1, total: orders.length, limit: 25 };
+        document.getElementById("countNote").textContent = `${num(meta.total)} order${meta.total === 1 ? "" : "s"}`;
+        if (!orders.length) {
+          const filtered = state.q || state.status || state.payment_status;
+          box.innerHTML = emptyHTML(filtered ? "No orders match these filters." : "No orders yet.");
+          renderPager(document.getElementById("pager"), null);
+          return;
+        }
+        box.innerHTML = `
+          <div class="table-wrap"><table>
+            <thead><tr><th>Order #</th><th>Customer</th><th>Date</th><th class="right">Items</th>
+              <th class="right">Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${orders.map((o) => {
+                const name = (o.shipping && o.shipping.name) || (o.customer && o.customer.name) || "—";
+                const phone = (o.shipping && o.shipping.phone) || (o.customer && o.customer.phone) || "";
+                const inv = o.invoice_number ? encodeURIComponent(o.invoice_number) : "";
+                return `
+                <tr>
+                  <td class="nowrap"><a class="cell-title" href="order-detail.html?id=${Number(o.id)}">${esc(o.order_number || "#" + o.id)}</a>
+                    <div class="cell-sub">${o.order_type === "pickup" ? "Store pickup" : "Delivery"}</div></td>
+                  <td><div>${esc(name)}</div><div class="cell-sub">${esc(phone)}</div></td>
+                  <td class="nowrap">${esc(fmtDateTime(o.created_at))}</td>
+                  <td class="right num">${num(o.item_count ?? (o.items || []).length)}</td>
+                  <td class="right num nowrap"><b>${money(o.grand_total ?? o.total)}</b></td>
+                  <td>${paymentBadge(o.payment_status)}<div class="cell-sub">${esc(PAYMENT_METHODS[o.payment_method] || o.payment_method || "")}</div></td>
+                  <td>${statusBadge(o.status, o.status_label)}</td>
+                  <td><div class="row-actions">
+                    <a class="btn btn-outline btn-sm" href="order-detail.html?id=${Number(o.id)}">View</a>
+                    ${inv ? `<a class="btn btn-outline btn-sm" href="/invoice/${inv}?print=1" target="_blank" rel="noopener">${icon("printer")}Print invoice</a>
+                      <a class="btn btn-outline btn-sm" href="/invoice/${inv}/pdf" target="_blank" rel="noopener">${icon("download")}Download invoice</a>` : `<span class="muted small">No invoice</span>`}
+                  </div></td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table></div>`;
+        renderPager(document.getElementById("pager"), meta, (pg) => { state.page = pg; load(); window.scrollTo({ top: 0 }); });
       } catch (err) {
-        alert("Could not update: " + err.message);
+        box.innerHTML = errorHTML(err.message);
       }
     }
 

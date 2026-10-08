@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    const state = { page: Number(qsGet("page")) || 1, q: qsGet("q") || "", status: qsGet("status") || "" };
+    let rows = [];
+
+    async function init() {
+      const host = await renderAdminShell("inventory.html", "Inventory");
+      if (!host) return;
+      host.innerHTML = `
+        <div id="invAlert"></div>
+        <div class="stat-grid" id="tiles" role="group" aria-label="Filter by stock level"></div>
+        <div class="card">
+          <div class="card-head"><div><h2>Stock levels</h2><p class="sub" id="countNote">&nbsp;</p></div></div>
+          <div class="toolbar" role="search">
+            <label class="sr-only" for="invSearch">Search inventory</label>
+            <input id="invSearch" class="search" type="search" placeholder="Search name, SKU or brand…" value="${esc(state.q)}">
+          </div>
+          <div id="invBox">${loadingHTML("Loading inventory…")}</div>
+          <div id="pager"></div>
+        </div>`;
+      document.getElementById("invSearch").addEventListener("input", debounce((e) => { state.q = e.target.value.trim(); state.page = 1; load(); }, 350));
+      await load();
+    }
+
+    function renderTiles(s) {
+      const tile = (key, label, value, dot) => `
+        <button class="stat ${state.status === key ? "is-active" : ""}" data-status="${key}" aria-pressed="${state.status === key}">
+          <div class="label">${dot ? `<span class="dot ${dot}"></span>` : ""}${label}</div><div class="value">${num(value)}</div></button>`;
+      const el = document.getElementById("tiles");
+      el.innerHTML = tile("", "All products", s.total) + tile("in", "In stock", s.in, "dot-good") +
+        tile("low", "Low stock", s.low, "dot-warn") + tile("out", "Out of stock", s.out, "dot-bad");
+      el.querySelectorAll("[data-status]").forEach((b) => b.addEventListener("click", () => { state.status = b.dataset.status; state.page = 1; load(); }));
+      const alertBox = document.getElementById("invAlert");
+      alertBox.innerHTML = s.low || s.out ? `<div class="alert alert-warning hstack" role="status">${icon("alert")}
+        <span><b>${num(s.out)}</b> product${s.out === 1 ? " is" : "s are"} out of stock and <b>${num(s.low)}</b> ${s.low === 1 ? "is" : "are"} running low.</span>
+        ${s.out ? `<button class="btn btn-outline btn-sm" data-go="out">Show out of stock</button>` : ""}
+        ${s.low ? `<button class="btn btn-outline btn-sm" data-go="low">Show low stock</button>` : ""}</div>` : "";
+      alertBox.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => { state.status = b.dataset.go; state.page = 1; load(); }));
+    }
+
+    async function load() {
+      setQuery({ q: state.q, status: state.status, page: state.page > 1 ? state.page : "" });
+      const box = document.getElementById("invBox");
+      const p = new URLSearchParams({ page: state.page, limit: 50 });
+      if (state.q) p.set("q", state.q);
+      if (state.status) p.set("status", state.status);
+      try {
+        const res = await api("/admin/inventory?" + p);
+        rows = res.data || [];
+        const meta = res.meta || { page: 1, pages: 1, total: rows.length, limit: 50 };
+        renderTiles(res.summary || { total: 0, in: 0, low: 0, out: 0 });
+        document.getElementById("countNote").textContent = `${num(meta.total)} product${meta.total === 1 ? "" : "s"}` +
+          (state.status ? ` · ${{ in: "in stock", low: "low stock", out: "out of stock" }[state.status]}` : "");
+        if (!rows.length) {
+          box.innerHTML = emptyHTML(state.q || state.status ? "No products match these filters." : "No products yet.");
+          renderPager(document.getElementById("pager"), null);
+          return;
+        }
+        box.innerHTML = `<div class="table-wrap"><table>
+          <thead><tr><th>Product</th><th>Status</th><th>Adjust</th><th>Stock</th><th>Min stock</th><th>Available</th><th></th></tr></thead>
+          <tbody>${rows.map(rowHTML).join("")}</tbody></table></div>`;
+        rows.forEach(bindRow);
+        renderPager(document.getElementById("pager"), meta, (pg) => { state.page = pg; load(); window.scrollTo({ top: 0 }); });
+      } catch (err) {
+        box.innerHTML = errorHTML(err.message);
+      }
+    }
+
+    function rowHTML(p) {
+      return `<tr id="r${p.id}">
+        <td><div class="cell-title"><a href="product-form.html?id=${p.id}">${esc(p.name)}</a></div>
+          <div class="cell-sub">${esc([p.sku, p.brand, p.unit].filter(Boolean).join(" · "))}</div></td>
+        <td data-badge>${stockBadge(p)}</td>
+        <td><div class="hstack" style="flex-wrap:nowrap;gap:4px">
+          <button class="btn btn-outline btn-sm" data-adj="-1" aria-label="Decrease stock of ${esc(p.name)} by 1">−1</button>
+          <button class="btn btn-outline btn-sm" data-adj="1" aria-label="Increase stock of ${esc(p.name)} by 1">+1</button>
+          <button class="btn btn-outline btn-sm" data-adj="10" aria-label="Increase stock of ${esc(p.name)} by 10">+10</button>
+        </div></td>
+        <td><label class="sr-only" for="s${p.id}">Stock</label><input class="input-sm" id="s${p.id}" type="number" min="0" step="1" value="${Number(p.stock) || 0}"></td>
+        <td><label class="sr-only" for="m${p.id}">Minimum stock</label><input class="input-sm" id="m${p.id}" type="number" min="0" step="1" value="${Number(p.min_stock ?? 5)}"></td>
+        <td><label class="switch"><input type="checkbox" id="a${p.id}" ${p.availability ? "checked" : ""} aria-label="Available: ${esc(p.name)}"><span class="track"></span></label></td>
+        <td><button class="btn btn-primary btn-sm" data-save>Save</button></td>
+      </tr>`;
+    }
+
+    function bindRow(p) {
+      const tr = document.getElementById("r" + p.id);
+      tr.querySelectorAll("[data-adj]").forEach((b) => b.addEventListener("click", () => save(p, { adjust: Number(b.dataset.adj) }, b)));
+      tr.querySelector("[data-save]").addEventListener("click", (e) => {
+        const stock = tr.querySelector("#s" + p.id).value, min = tr.querySelector("#m" + p.id).value;
+        if (!/^\d+$/.test(stock) || !/^\d+$/.test(min)) { toast("Stock and minimum stock must be whole numbers (0 or more).", "error"); return; }
+        save(p, { stock: Number(stock), min_stock: Number(min), availability: tr.querySelector("#a" + p.id).checked }, e.currentTarget);
+      });
+      tr.querySelector("#a" + p.id).addEventListener("change", (e) => save(p, { availability: e.target.checked }, e.target));
+    }
+
+    async function save(p, body, el) {
+      el.disabled = true;
+      try {
+        const res = await api("/admin/inventory/" + p.id, { method: "PUT", body: JSON.stringify(body) });
+        const np = res.data;
+        Object.assign(p, np);
+        const tr = document.getElementById("r" + p.id);
+        tr.querySelector("[data-badge]").innerHTML = stockBadge(np);
+        tr.querySelector("#s" + p.id).value = np.stock;
+        tr.querySelector("#m" + p.id).value = np.min_stock ?? 5;
+        tr.querySelector("#a" + p.id).checked = !!np.availability;
+        toast(`${np.name}: stock ${np.stock}`, "success", 2500);
+        refreshSummary();
+      } catch (err) {
+        toast(err.message, "error");
+        if (body.availability !== undefined && el.type === "checkbox") el.checked = !body.availability;
+      }
+      el.disabled = false;
+    }
+
+    const refreshSummary = debounce(async () => {
+      try { const r = await api("/admin/inventory?limit=1"); renderTiles(r.summary); } catch {}
+    }, 600);
+
+    init();
+  </script>
+</body>
+</html>

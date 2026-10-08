@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    let host;
+
+    async function init() {
+      host = await renderAdminShell("ai.html", "AI tools");
+      if (!host) return;
+      host.innerHTML = loadingHTML("Loading AI overview…");
+      await load();
+      if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+    }
+
+    async function load() {
+      let d;
+      try { d = (await api("/admin/ai/overview")).data; }
+      catch (err) { host.innerHTML = `<div class="card">${errorHTML(err.message)}</div>`; return; }
+      const a = d.assistant || {}, im = d.images || {}, c = im.counts || {};
+      const list = (arr) => arr && arr.length ? arr.map((x) => `<span class="badge badge-grey no-dot">${esc(x)}</span>`).join(" ") : `<span class="muted">None</span>`;
+      const models = Object.entries(im.models || {});
+
+      host.innerHTML = `
+        <section id="assistant" class="anchor-offset">
+          <div class="card">
+            <div class="card-head"><div><h2>AI Shopping Assistant</h2><p class="sub">The chat helper customers use on the website</p></div>
+              <a class="btn btn-outline btn-sm" href="settings.html#ai">Assistant settings</a></div>
+            <div class="stat-grid">
+              ${statTile({ label: "Mode", value: (a.mode || "—").split(" (")[0], hint: (a.mode || "").includes("(") ? a.mode.slice(a.mode.indexOf("(") + 1, -1) : "" })}
+              ${statTile({ label: "Conversations", value: num(a.conversations) })}
+              ${statTile({ label: "Messages", value: num(a.messages) })}
+              ${statTile({ label: "Customer questions", value: num(a.customer_questions) })}
+            </div>
+            <h3>Recent conversations</h3>
+            ${(d.conversations || []).length ? (d.conversations || []).map((cv) => {
+              const first = (cv.messages || []).find((m) => m.role === "user");
+              return `<details class="conv">
+                <summary><b>#${Number(cv.id)}</b><span class="muted">${esc(fmtDateTime(cv.created_at))}</span>
+                  <span class="badge badge-grey no-dot">${num((cv.messages || []).length)} messages</span>
+                  <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(first ? first.content.slice(0, 90) : "")}</span></summary>
+                <div class="conv-body">${(cv.messages || []).map((m) => `<div class="chat-msg ${m.role === "user" ? "user" : "assistant"}"><span class="sr-only">${m.role === "user" ? "Customer" : "Assistant"}: </span>${esc(m.content)}</div>`).join("") || `<span class="muted">No messages.</span>`}</div>
+              </details>`;
+            }).join("") : emptyHTML("No conversations yet.")}
+          </div>
+        </section>
+
+        <section id="images" class="anchor-offset">
+          <div class="card">
+            <div class="card-head"><div><h2>AI Image Generator</h2><p class="sub">Creates product photos for items without a real image</p></div>
+              <div class="hstack">
+                <button class="btn btn-outline" id="genMissing">${icon("image")}Generate Missing</button>
+                <button class="btn btn-outline" id="genAll">${icon("sparkles")}Generate All</button>
+              </div></div>
+            <div class="progress-panel" id="jobPanel" hidden></div>
+            <div class="stat-grid">
+              ${statTile({ label: "Ready", value: num(c.ready), dot: "dot-good", href: "products.html?image_status=ready" })}
+              ${statTile({ label: "Missing", value: num(c.missing), dot: "dot-warn", href: "products.html?image_status=missing" })}
+              ${statTile({ label: "Fallback", value: num(c.fallback), dot: "dot-grey", href: "products.html?image_status=fallback" })}
+              ${statTile({ label: "Failed", value: num(c.failed), dot: "dot-bad", href: "products.html?image_status=failed" })}
+              ${statTile({ label: "Processing", value: num(c.processing), dot: "dot-info" })}
+              ${statTile({ label: "Success rate", value: im.success_rate == null ? "—" : im.success_rate + "%", hint: im.success_rate == null ? "No attempts yet" : "ready ÷ attempted" })}
+            </div>
+            ${!(im.usable_providers || []).length ? `<div class="alert alert-warning">No usable AI image provider is configured, so products get a generated SVG fallback image instead. Configure a provider in the server's environment settings.</div>` : ""}
+            <dl class="kv">
+              <dt>Primary provider</dt><dd>${im.primary_provider ? esc(im.primary_provider) : `<span class="muted">Not configured</span>`}</dd>
+              <dt>Fallback providers</dt><dd>${list(im.fallback_providers)}</dd>
+              <dt>Usable providers</dt><dd>${list(im.usable_providers)}</dd>
+              <dt>Models</dt><dd>${models.length ? models.map(([p, m]) => `<div><b>${esc(p)}</b>: ${esc(m || "default")}</div>`).join("") : `<span class="muted">—</span>`}</dd>
+            </dl>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Failed products</h2><span class="sub">${num((im.failed || []).length)} shown</span></div>
+            <div id="failedBox">${(im.failed || []).length ? loadingHTML() : emptyHTML("No failed images.")}</div>
+          </div>
+        </section>`;
+
+      const gm = document.getElementById("genMissing"), ga = document.getElementById("genAll");
+      const panel = document.getElementById("jobPanel");
+      gm.addEventListener("click", () => runImageJob("missing", panel, { buttons: [gm, ga], onDone: refreshLater }));
+      ga.addEventListener("click", () => runImageJob("all", panel, { buttons: [gm, ga], onDone: refreshLater }));
+      if (im.active_job && im.active_job.state === "running") {
+        runImageJob({ job_id: im.active_job.id, total: im.active_job.total }, panel, { buttons: [gm, ga], onDone: refreshLater });
+      }
+      if ((im.failed || []).length) renderFailed(im.failed);
+    }
+
+    function refreshLater() { setTimeout(load, 1200); }
+
+    async function renderFailed(failed) {
+      const names = {};
+      try {
+        const r = await api("/products?image_status=failed&limit=100");
+        (r.data || []).forEach((p) => (names[p.id] = p));
+      } catch {}
+      document.getElementById("failedBox").innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>Product</th><th>Error</th><th>Actions</th></tr></thead>
+        <tbody>${failed.map((f) => {
+          const p = names[f.id];
+          return `<tr><td><a class="cell-title" href="product-form.html?id=${Number(f.id)}">${esc(p ? p.name : "Product #" + f.id)}</a></td>
+            <td class="small" style="max-width:420px">${esc(f.error || "Unknown error")}</td>
+            <td><div class="row-actions"><a class="btn btn-outline btn-sm" href="product-form.html?id=${Number(f.id)}">Edit product</a>
+              <button class="btn btn-outline btn-sm" onclick="regenerateImage(${Number(f.id)}, this, refreshLater)">${icon("refresh")}Regenerate</button></div></td></tr>`;
+        }).join("")}</tbody></table></div>`;
+    }
+
+    window.addEventListener("hashchange", () => document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth" }));
+    init();
+  </script>
+</body>
+</html>

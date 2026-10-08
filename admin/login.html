@@ -3,47 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Login | M Hardware & Sanitary</title>
-  <link rel="stylesheet" href="css/admin.css">
+  <meta name="robots" content="noindex">
+  <title>Admin Login | M Hardware &amp; Sanitary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/admin/css/admin.css">
 </head>
 <body>
 
 <div class="login-wrap">
-  <div class="login-card">
-    <h1>🛠️ Admin Login</h1>
-    <p class="sub">M Hardware &amp; Sanitary Control Panel</p>
+  <main class="login-card">
+    <div class="login-logo" aria-hidden="true">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>
+    </div>
+    <h1>Admin sign in</h1>
+    <p class="sub">M Hardware &amp; Sanitary control panel</p>
 
-    <div id="loginAlert"></div>
+    <div id="loginAlert" aria-live="polite"></div>
 
-    <form id="loginForm">
+    <form id="loginForm" novalidate>
       <div class="form-group">
-        <label>Username or Email</label>
-        <input name="username" required autofocus>
+        <label for="username">Username or email</label>
+        <input id="username" name="username" autocomplete="username" required autofocus>
       </div>
       <div class="form-group">
-        <label>Password</label>
-        <input type="password" name="password" required>
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" autocomplete="current-password" required>
       </div>
-      <button class="btn btn-primary btn-block" type="submit">Login</button>
+      <button class="btn btn-primary btn-block" type="submit" id="loginBtn" style="padding:10px 14px">Sign in</button>
     </form>
 
-    <p style="text-align:center;color:#6b7280;font-size:.82rem;margin-top:18px">
-      Default: <b>admin</b> / <b>admin123</b> — change it after first login.
-    </p>
-  </div>
+    <p class="login-foot">First time? Sign in with the default account, then change the password in Settings.</p>
+    <p class="login-foot" style="margin-top:6px"><a href="/">← Back to website</a></p>
+  </main>
 </div>
 
-<script src="js/admin.js"></script>
+<script src="/admin/js/admin.js"></script>
 <script>
   document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const box = document.getElementById("loginAlert");
     const payload = Object.fromEntries(new FormData(e.target).entries());
+    if (!payload.username.trim() || !payload.password) {
+      box.innerHTML = `<div class="alert alert-error" role="alert">Enter your username and password.</div>`;
+      return;
+    }
+    const btn = document.getElementById("loginBtn");
+    btn.disabled = true; btn.textContent = "Signing in…";
     try {
       await api("/auth/login", { method: "POST", body: JSON.stringify(payload) });
-      location.href = "dashboard.html";
+      location.href = "/admin/dashboard.html";
     } catch (err) {
-      box.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+      const msg = err.status === 429 ? err.message || "Too many attempts. Please wait and try again."
+        : (err.message === "Not authenticated" ? "Invalid username or password." : err.message);
+      box.innerHTML = `<div class="alert alert-error" role="alert">${esc(msg)}</div>`;
+      btn.disabled = false; btn.textContent = "Sign in";
     }
   });
 </script>

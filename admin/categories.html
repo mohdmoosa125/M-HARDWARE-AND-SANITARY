@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Categories | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
@@ -12,123 +15,205 @@
     let tree = [];
 
     async function init() {
-      const host = await renderAdminShell("categories.html");
+      const host = await renderAdminShell("categories.html", "Categories");
       if (!host) return;
-      document.getElementById("pageTitle").textContent = "Categories";
 
       host.innerHTML = `
-        <div class="card">
-          <h2>Add Category</h2>
-          <div id="catAlert"></div>
-          <form id="catForm">
-            <div class="form-row">
-              <div class="form-group">
-                <label>Name *</label>
-                <input name="name" required placeholder="e.g. Sanitary">
-              </div>
-              <div class="form-group">
-                <label>Parent Category (for subcategory)</label>
-                <select name="parent_id" id="parentSelect">
-                  <option value="">— Top level category —</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>Description</label>
-              <input name="description">
-            </div>
-            <div class="form-group">
-              <label>Image URL (optional, upload via Gallery page if needed)</label>
-              <input name="image" placeholder="/uploads/categories/...">
-            </div>
-            <button class="btn btn-primary" type="submit">➕ Add Category</button>
-          </form>
-        </div>
-
-        <div class="card">
-          <h2>All Categories</h2>
-          <div id="catTree"><p class="loading">Loading…</p></div>
+        <div class="grid-2 grid-side">
+          <div class="card">
+            <h2>Add category</h2>
+            <form id="catForm" novalidate>
+              <div class="form-group"><label for="cName">Name *</label>
+                <input id="cName" name="name" required placeholder="e.g. Sanitary"></div>
+              <div class="form-group"><label for="parentSelect">Parent category</label>
+                <select name="parent_id" id="parentSelect"></select>
+                <div class="help">Choose a parent to create a subcategory.</div></div>
+              <div class="form-group"><label for="cDesc">Description</label>
+                <input id="cDesc" name="description"></div>
+              <div class="form-group"><label for="cImgFile">Image (optional)</label>
+                <input type="file" id="cImgFile" accept="image/*">
+                <input type="hidden" name="image" id="cImg">
+                <div class="img-preview" id="cImgPrev"></div></div>
+              <button class="btn btn-primary" type="submit">${icon("plus")}Add category</button>
+            </form>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>All categories</h2><span class="sub" id="catCount"></span></div>
+            <div id="catTree">${loadingHTML()}</div>
+          </div>
         </div>`;
 
       document.getElementById("catForm").addEventListener("submit", addCategory);
+      document.getElementById("cImgFile").addEventListener("change", async (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        try {
+          const url = await apiUpload("categories", f);
+          document.getElementById("cImg").value = url;
+          document.getElementById("cImgPrev").innerHTML = `<div class="img-tile"><img src="${esc(url)}" alt="Category image preview"></div>`;
+        } catch (err) { toast("Upload failed: " + err.message, "error"); }
+      });
       await loadTree();
     }
 
     async function loadTree() {
       try {
-        const res = await api("/categories?tree=1");
-        tree = res.data || [];
+        tree = (await api("/categories?tree=1")).data || [];
         renderTree();
-        fillParentSelect();
+        document.getElementById("parentSelect").innerHTML = `<option value="">— Top level category —</option>` +
+          tree.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
       } catch (err) {
-        document.getElementById("catTree").innerHTML =
-          `<p class="empty">${esc(err.message)}</p>`;
+        document.getElementById("catTree").innerHTML = errorHTML(err.message);
       }
     }
 
-    function fillParentSelect() {
-      const sel = document.getElementById("parentSelect");
-      sel.innerHTML = `<option value="">— Top level category —</option>` +
-        tree.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+    function catLine(cat, isChild) {
+      return `
+        <div class="cat-line">
+          <div class="hstack" style="min-width:0">
+            ${cat.image ? `<img class="thumb" src="${esc(cat.image)}" alt="" loading="lazy">` : `<span class="thumb-empty">None</span>`}
+            <div style="min-width:0">
+              <div class="cell-title">${isChild ? "↳ " : ""}${esc(cat.name)}
+                ${cat.is_active === false ? `<span class="badge badge-grey">Hidden</span>` : ""}</div>
+              <div class="cell-sub">/${esc(cat.slug)}${cat.product_count !== undefined ? ` · ${num(cat.product_count)} products` : ""}</div>
+            </div>
+          </div>
+          <div class="hstack">
+            <label class="switch small"><input type="checkbox" ${cat.featured ? "checked" : ""} onchange="toggleFeatured(${cat.id}, this)" aria-label="Featured: ${esc(cat.name)}"><span class="track"></span>Featured</label>
+            <button class="btn btn-outline btn-sm" onclick="genImage(${cat.id}, this)">${icon("sparkles")}Generate image</button>
+            <button class="btn btn-outline btn-sm" onclick="editCategory(${cat.id})">Edit</button>
+            <button class="btn btn-danger-outline btn-sm" onclick="deleteCategory(${cat.id})">Delete</button>
+          </div>
+        </div>`;
     }
 
     function renderTree() {
       const host = document.getElementById("catTree");
-      if (!tree.length) {
-        host.innerHTML = `<p class="empty">No categories yet. Add one above.</p>`;
-        return;
-      }
-
+      const total = tree.reduce((s, c) => s + 1 + (c.children || []).length, 0);
+      document.getElementById("catCount").textContent = total ? `${total} categories` : "";
+      if (!tree.length) { host.innerHTML = emptyHTML("No categories yet. Add one using the form."); return; }
       host.innerHTML = tree.map((cat) => `
-        <div style="border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-            <div>
-              <b>${esc(cat.name)}</b>
-              <small style="color:#6b7280"> &nbsp;/${esc(cat.slug)}</small>
-              <span class="badge badge-grey">${cat.product_count || 0} products</span>
-            </div>
-            <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id})">Delete</button>
-          </div>
-
-          ${cat.children && cat.children.length ? `
-            <div style="margin-top:10px;padding-left:16px;border-left:2px solid #e5e7eb">
-              ${cat.children.map((sub) => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
-                  <span>↳ ${esc(sub.name)}</span>
-                  <button class="btn btn-sm btn-danger" onclick="deleteCategory(${sub.id})">Delete</button>
-                </div>`).join("")}
-            </div>` : ""}
+        <div class="cat-row">
+          ${catLine(cat)}
+          ${cat.children && cat.children.length ? `<div class="cat-children">${cat.children.map((s) => catLine(s, true)).join("")}</div>` : ""}
         </div>`).join("");
+    }
+
+    function findCat(id) {
+      for (const c of tree) {
+        if (c.id === id) return c;
+        const s = (c.children || []).find((x) => x.id === id);
+        if (s) return s;
+      }
+      return null;
     }
 
     async function addCategory(e) {
       e.preventDefault();
       const form = e.target;
-      const box = document.getElementById("catAlert");
+      if (!form.name.value.trim()) { form.name.classList.add("is-invalid"); toast("Category name is required", "error"); form.name.focus(); return; }
+      form.name.classList.remove("is-invalid");
       const payload = {
         name: form.name.value.trim(),
         parent_id: form.parent_id.value || null,
         description: form.description.value,
         image: form.image.value,
       };
-
       try {
         await api("/categories", { method: "POST", body: JSON.stringify(payload) });
-        box.innerHTML = `<div class="alert alert-success">Category added.</div>`;
+        toast("Category added", "success");
         form.reset();
+        document.getElementById("cImg").value = "";
+        document.getElementById("cImgPrev").innerHTML = "";
         await loadTree();
       } catch (err) {
-        box.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
+        toast(err.message, "error");
       }
     }
 
+    async function toggleFeatured(id, cb) {
+      cb.disabled = true;
+      try {
+        await api("/categories/" + id, { method: "PUT", body: JSON.stringify({ featured: cb.checked }) });
+        const c = findCat(id); if (c) c.featured = cb.checked;
+        toast(cb.checked ? "Category featured" : "Category unfeatured", "success", 2500);
+      } catch (err) { cb.checked = !cb.checked; toast(err.message, "error"); }
+      cb.disabled = false;
+    }
+
+    async function genImage(id, btn) {
+      await withBusy(btn, async () => {
+        try {
+          const res = await api(`/categories/${id}/generate-image`, { method: "POST" });
+          toast(res.message || "Category image updated", "success", 6000);
+          await loadTree();
+        } catch (err) {
+          toast(err.message, "warning", 8000);
+        }
+      }, "Generating…");
+    }
+
+    function editCategory(id) {
+      const c = findCat(id);
+      if (!c) return;
+      const parents = tree.filter((p) => p.id !== id);
+      const m = openModal({
+        title: "Edit category",
+        body: `<form id="editCat" novalidate>
+          <div class="form-group"><label for="eName">Name *</label><input id="eName" value="${esc(c.name)}"></div>
+          <div class="form-group"><label for="eParent">Parent category</label>
+            <select id="eParent"><option value="">— Top level —</option>${parents.map((p) => `<option value="${p.id}" ${c.parent_id === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
+          <div class="form-group"><label for="eDesc">Description</label><input id="eDesc" value="${esc(c.description || "")}"></div>
+          <div class="form-row">
+            <div class="form-group"><label for="eSort">Sort order</label><input id="eSort" type="number" value="${Number(c.sort_order) || 0}"></div>
+            <div class="form-group"><label>&nbsp;</label><label class="switch"><input type="checkbox" id="eActive" ${c.is_active !== false ? "checked" : ""}><span class="track"></span>Visible on site</label></div>
+          </div>
+          <div class="form-group"><label for="eImgFile">Image</label>
+            <input type="file" id="eImgFile" accept="image/*">
+            <div class="img-preview" id="eImgPrev"></div></div>
+        </form>`,
+        footer: `<button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" id="eSave">Save changes</button>`,
+      });
+      let image = c.image || "";
+      const prev = () => {
+        document.getElementById("eImgPrev").innerHTML = image
+          ? `<div class="img-tile"><img src="${esc(image)}" alt="Category image"><div class="hstack"><a class="btn btn-ghost btn-sm" href="${esc(image)}" target="_blank" rel="noopener">View</a><button type="button" class="btn btn-ghost btn-sm" id="eImgClear" style="color:var(--danger)">Remove</button></div></div>`
+          : `<span class="muted small">No image</span>`;
+        const cl = document.getElementById("eImgClear"); if (cl) cl.onclick = () => { image = ""; prev(); };
+      };
+      prev();
+      document.getElementById("eImgFile").addEventListener("change", async (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        try { image = await apiUpload("categories", f); prev(); } catch (err) { toast("Upload failed: " + err.message, "error"); }
+      });
+      document.getElementById("eSave").onclick = async (ev) => {
+        const name = document.getElementById("eName").value.trim();
+        if (!name) { document.getElementById("eName").classList.add("is-invalid"); return; }
+        await withBusy(ev.currentTarget, async () => {
+          try {
+            await api("/categories/" + id, { method: "PUT", body: JSON.stringify({
+              name, parent_id: document.getElementById("eParent").value || null,
+              description: document.getElementById("eDesc").value, image,
+              sort_order: document.getElementById("eSort").value || 0,
+              is_active: document.getElementById("eActive").checked,
+            }) });
+            toast("Category updated", "success");
+            m.close();
+            await loadTree();
+          } catch (err) { toast(err.message, "error"); }
+        }, "Saving…");
+      };
+    }
+
     async function deleteCategory(id) {
-      if (!confirm("Delete this category? Products will be un-categorised, not deleted.")) return;
+      const c = findCat(id);
+      const ok = await confirmDialog({ title: "Delete category?", message: `Delete "${c ? c.name : "this category"}"? Its products will become un-categorised (they are not deleted).`, confirmLabel: "Delete category", danger: true });
+      if (!ok) return;
       try {
         await api("/categories/" + id, { method: "DELETE" });
+        toast("Category deleted", "success");
         await loadTree();
       } catch (err) {
-        alert(err.message);
+        toast(err.message, "error");
       }
     }
 

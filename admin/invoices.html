@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoices | M Hardware Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <script src="js/admin.js"></script>
+  <script>
+    const state = { page: Number(qsGet("page")) || 1, q: qsGet("q") || "" };
+
+    async function init() {
+      const host = await renderAdminShell("invoices.html", "Invoices");
+      if (!host) return;
+      host.innerHTML = `
+        <div class="card">
+          <div class="card-head"><div><h2>Invoices</h2><p class="sub" id="countNote">&nbsp;</p></div></div>
+          <div class="toolbar" role="search">
+            <label class="sr-only" for="iSearch">Search invoices</label>
+            <input id="iSearch" class="search" type="search" placeholder="Invoice no., order no., customer or phone…" value="${esc(state.q)}">
+          </div>
+          <div id="invBox">${loadingHTML("Loading invoices…")}</div>
+          <div id="pager"></div>
+        </div>`;
+      document.getElementById("iSearch").addEventListener("input", debounce((e) => { state.q = e.target.value.trim(); state.page = 1; load(); }, 350));
+      await load();
+    }
+
+    async function load() {
+      setQuery({ q: state.q, page: state.page > 1 ? state.page : "" });
+      const box = document.getElementById("invBox");
+      const p = new URLSearchParams({ page: state.page, limit: 50 });
+      if (state.q) p.set("q", state.q);
+      try {
+        const res = await api("/invoices?" + p);
+        const rows = res.data || [];
+        const meta = res.meta || { page: 1, pages: 1, total: rows.length, limit: 50 };
+        document.getElementById("countNote").textContent = `${num(meta.total)} invoice${meta.total === 1 ? "" : "s"}`;
+        if (!rows.length) {
+          box.innerHTML = emptyHTML(state.q ? "No invoices match your search." : "No invoices yet. An invoice is created with every order.");
+          renderPager(document.getElementById("pager"), null);
+          return;
+        }
+        box.innerHTML = `<div class="table-wrap"><table>
+          <thead><tr><th>Invoice #</th><th>Order #</th><th>Customer</th><th>Date</th><th class="right">Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>${rows.map((i) => {
+            const n = encodeURIComponent(i.invoice_number);
+            return `<tr>
+              <td class="nowrap"><a class="cell-title" href="/invoice/${n}" target="_blank" rel="noopener">${esc(i.invoice_number)}</a></td>
+              <td class="nowrap"><a href="order-detail.html?id=${Number(i.order_id)}">${esc(i.order_number)}</a></td>
+              <td><div>${esc(i.customer || "—")}</div><div class="cell-sub">${esc(i.phone || "")}</div></td>
+              <td class="nowrap">${esc(fmtDate(i.issued_at))}</td>
+              <td class="right num nowrap"><b>${money(i.grand_total)}</b></td>
+              <td>${paymentBadge(i.payment_status)}</td>
+              <td>${statusBadge(i.status)}</td>
+              <td><div class="row-actions">
+                <a class="btn btn-outline btn-sm" href="/invoice/${n}" target="_blank" rel="noopener">${icon("eye")}View</a>
+                <a class="btn btn-outline btn-sm" href="/invoice/${n}?print=1" target="_blank" rel="noopener">${icon("printer")}Print</a>
+                <a class="btn btn-outline btn-sm" href="/invoice/${n}/pdf" target="_blank" rel="noopener">${icon("download")}Download</a>
+              </div></td></tr>`;
+          }).join("")}</tbody></table></div>`;
+        renderPager(document.getElementById("pager"), meta, (pg) => { state.page = pg; load(); window.scrollTo({ top: 0 }); });
+      } catch (err) {
+        box.innerHTML = errorHTML(err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
