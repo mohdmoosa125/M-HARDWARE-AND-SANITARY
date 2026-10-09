@@ -89,6 +89,17 @@ function money(value) {
     n.toLocaleString("en-IN", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
 }
 
+/* Products without a researched price show "Price on request" instead of ₹0. */
+function priceText(p) {
+  return Number(p.final_price) > 0 ? money(p.final_price) : "Price on request";
+}
+
+/* Listed but stock not yet counted -> ask the store rather than "Out of stock". */
+function stockText(p) {
+  if (p.in_stock) return "In stock";
+  return p.availability && !p.stock ? "Enquire for availability" : "Out of stock";
+}
+
 function fmtDate(iso, withTime = false) {
   if (!iso) return "";
   const d = new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");

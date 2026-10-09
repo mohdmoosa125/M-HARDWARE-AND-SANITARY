@@ -560,6 +560,9 @@ textarea { min-height: 96px; resize: vertical; }
 /* ---------------- AI widget ---------------- */
 .ai-fab { position: fixed; right: 22px; bottom: 22px; z-index: 850; display: inline-flex; align-items: center; gap: 10px; padding: 12px 18px 12px 14px; border-radius: 999px; border: 0; cursor: pointer; background: linear-gradient(135deg, var(--brand), #1c7bbd); color: #fff; font-weight: 700; box-shadow: 0 12px 28px rgba(15, 76, 129, .38); transition: transform .2s var(--ease); }
 .ai-fab:hover { transform: translateY(-2px); }
+.ai-fab { touch-action: none; user-select: none; }
+.ai-fab.dragging { cursor: grabbing; transform: scale(1.05); transition: none; }
+.ai-fab:focus-visible { outline: 3px solid #fbbf24; outline-offset: 3px; }
 .ai-fab .icon { width: 22px; height: 22px; }
 .ai-panel { position: fixed; right: 22px; bottom: 88px; z-index: 860; width: 400px; max-width: calc(100vw - 32px); height: 600px; max-height: calc(100vh - 120px); background: #fff; border-radius: 22px; box-shadow: var(--shadow-lg); border: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; transform-origin: bottom right; animation: pop .2s var(--ease); }
 @keyframes pop { from { opacity: 0; transform: scale(.96) translateY(8px); } }

@@ -58,7 +58,7 @@ function initHeaderSearch() {
             return `<a href="${productUrl(p)}" role="option">
               <img src="${imgSrc(p.image)}" alt="" loading="lazy" onerror="this.src=PLACEHOLDER">
               <span><span class="s-name">${esc(p.name)}</span>
-              <span class="s-meta">${money(p.final_price)} · ${p.in_stock ? "In stock" : "Out of stock"}${p.sku ? " · " + esc(p.sku) : ""}</span></span></a>`;
+              <span class="s-meta">${priceText(p)} · ${stockText(p)}${p.sku ? " · " + esc(p.sku) : ""}</span></span></a>`;
           }).join("") + `<a class="s-all" href="/products.html?q=${encodeURIComponent(q)}">See all results for “${esc(q)}”</a>`
         : `<div class="s-empty">No products match “${esc(q)}”. Try a simpler word like “tap” or “pipe”, or <a href="#" onclick="hideSuggest();openAI(${esc(JSON.stringify(q))});return false;">ask our AI assistant</a>.</div>`;
       box.classList.remove("hidden");

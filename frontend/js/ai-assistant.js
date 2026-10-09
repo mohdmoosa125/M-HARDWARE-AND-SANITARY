@@ -26,8 +26,93 @@ function initAIAssistant() {
   fab.setAttribute("aria-label", "Open AI shopping assistant");
   fab.setAttribute("aria-expanded", "false");
   fab.innerHTML = `${icon("sparkle")}<span class="ai-label">Ask AI</span>`;
-  fab.onclick = () => (aiState.open ? closeAI() : openAI());
+  fab.title = "Drag to move · Shift+Arrow keys to move";
+  fab.onclick = () => {
+    if (aiDrag.moved) { aiDrag.moved = false; return; }   // a drag is not a click
+    aiState.open ? closeAI() : openAI();
+  };
   document.body.appendChild(fab);
+  makeFabMovable(fab);
+}
+
+/* ---------- movable launcher (mouse, touch, keyboard) ---------- */
+const AI_POS_KEY = "aiFabPos";
+const aiDrag = { active: false, moved: false, dx: 0, dy: 0, sx: 0, sy: 0 };
+
+function placeFab(fab, x, y) {
+  const m = 8;
+  const maxX = window.innerWidth - fab.offsetWidth - m;
+  const maxY = window.innerHeight - fab.offsetHeight - m;
+  x = Math.min(Math.max(m, x), Math.max(m, maxX));
+  y = Math.min(Math.max(m, y), Math.max(m, maxY));
+  Object.assign(fab.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" });
+  positionAIPanel();
+  return { x, y };
+}
+
+function saveFabPos(pos) {
+  try { sessionStorage.setItem(AI_POS_KEY, JSON.stringify(pos)); } catch {}
+}
+
+function makeFabMovable(fab) {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(AI_POS_KEY) || "null");
+    if (saved) requestAnimationFrame(() => placeFab(fab, saved.x, saved.y));
+  } catch {}
+
+  fab.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const r = fab.getBoundingClientRect();
+    Object.assign(aiDrag, { active: true, moved: false, dx: e.clientX - r.left, dy: e.clientY - r.top, sx: e.clientX, sy: e.clientY });
+    fab.setPointerCapture(e.pointerId);
+  });
+  fab.addEventListener("pointermove", (e) => {
+    if (!aiDrag.active) return;
+    if (!aiDrag.moved && Math.hypot(e.clientX - aiDrag.sx, e.clientY - aiDrag.sy) < 6) return;
+    aiDrag.moved = true;
+    fab.classList.add("dragging");
+    e.preventDefault();
+    placeFab(fab, e.clientX - aiDrag.dx, e.clientY - aiDrag.dy);
+  });
+  const end = (e) => {
+    if (!aiDrag.active) return;
+    aiDrag.active = false;
+    fab.classList.remove("dragging");
+    if (fab.hasPointerCapture?.(e.pointerId)) fab.releasePointerCapture(e.pointerId);
+    if (aiDrag.moved) saveFabPos({ x: fab.offsetLeft, y: fab.offsetTop });
+  };
+  fab.addEventListener("pointerup", end);
+  fab.addEventListener("pointercancel", end);
+
+  fab.addEventListener("keydown", (e) => {
+    const step = { ArrowLeft: [-20, 0], ArrowRight: [20, 0], ArrowUp: [0, -20], ArrowDown: [0, 20] }[e.key];
+    if (!step || !e.shiftKey) return;
+    e.preventDefault();
+    saveFabPos(placeFab(fab, fab.offsetLeft + step[0], fab.offsetTop + step[1]));
+  });
+  window.addEventListener("resize", () => {
+    if (fab.style.left) placeFab(fab, fab.offsetLeft, fab.offsetTop);
+  });
+}
+
+/* Keep the open chat panel next to the launcher (desktop/tablet only; phones use full screen). */
+function positionAIPanel() {
+  const panel = document.getElementById("aiPanel");
+  const fab = document.getElementById("aiFab");
+  if (!panel || !fab) return;
+  if (window.innerWidth <= 640 || !fab.style.left) {
+    Object.assign(panel.style, { left: "", top: "", right: "", bottom: "" });
+    return;
+  }
+  const f = fab.getBoundingClientRect(), m = 8, gap = 10;
+  const w = panel.offsetWidth || 400, h = panel.offsetHeight || 600;
+  let x = f.right - w;
+  if (x < m) x = f.left;
+  x = Math.min(Math.max(m, x), window.innerWidth - w - m);
+  let y = f.top - h - gap;
+  if (y < m) y = f.bottom + gap;
+  y = Math.min(Math.max(m, y), window.innerHeight - h - m);
+  Object.assign(panel.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" });
 }
 
 function buildAIPanel() {
@@ -76,6 +161,7 @@ function openAI(question) {
   let panel = document.getElementById("aiPanel");
   if (!panel) panel = buildAIPanel();
   panel.classList.remove("hidden");
+  positionAIPanel();
   aiState.open = true;
   document.getElementById("aiFab")?.setAttribute("aria-expanded", "true");
   document.getElementById("aiInput").focus();
@@ -131,7 +217,7 @@ function addAIMessage(role, text, data = {}) {
       return `<a class="ai-prod" href="${productUrl(p)}">
         <img src="${imgSrc(p.image)}" alt="" loading="lazy" onerror="this.src=PLACEHOLDER">
         <span><span class="ap-name">${esc(p.name)}</span><br>
-        <span class="ap-meta">${money(p.final_price)} / ${esc(p.unit || "piece")} · ${p.in_stock ? "In stock" : "Out of stock"}</span></span></a>`;
+        <span class="ap-meta">${priceText(p)} / ${esc(p.unit || "piece")} · ${stockText(p)}</span></span></a>`;
     }).join("");
     div.appendChild(wrap);
   }

@@ -7,14 +7,14 @@
 function priceHTML(p, big = false) {
   const off = p.discount_percent || 0;
   return `<div class="price-row">
-      <span class="price">${money(p.final_price)}</span>
+      <span class="price">${priceText(p)}</span>
       ${off ? `<span class="price-old">${money(p.price)}</span><span class="price-off">${off}% off</span>` : ""}
       <span class="price-unit">/ ${esc(p.unit || "piece")}</span>
     </div>`;
 }
 
 function stockHTML(p) {
-  if (!p.in_stock) return `<span class="stock-line stock-out"><span class="dot"></span>Out of stock</span>`;
+  if (!p.in_stock) return `<span class="stock-line ${stockText(p) === "Out of stock" ? "stock-out" : "stock-low"}"><span class="dot"></span>${stockText(p)}</span>`;
   if (p.stock_status === "low") return `<span class="stock-line stock-low"><span class="dot"></span>Only ${p.stock} left</span>`;
   return `<span class="stock-line stock-in"><span class="dot"></span>In stock</span>`;
 }
@@ -31,7 +31,7 @@ function productCardHTML(p) {
         <span class="badges">
           ${p.discount_percent ? `<span class="badge badge-sale">${p.discount_percent}% OFF</span>` : ""}
           ${p.featured ? `<span class="badge badge-brand">Featured</span>` : ""}
-          ${!p.in_stock ? `<span class="badge badge-out">Out of stock</span>` : ""}
+          ${!p.in_stock && stockText(p) === "Out of stock" ? `<span class="badge badge-out">Out of stock</span>` : ""}
         </span>
       </a>
       <div class="card-tools">
@@ -151,9 +151,9 @@ async function initComparePage() {
     const items = (await api("/products/compare?ids=" + ids.join(","))).data;
     items.forEach((p) => (window.__productCache[p.id] = p));
     const rows = [
-      ["Price", (p) => money(p.final_price) + (p.discount_percent ? ` <s class="muted">${money(p.price)}</s>` : "")],
+      ["Price", (p) => priceText(p) + (p.discount_percent ? ` <s class="muted">${money(p.price)}</s>` : "")],
       ["Discount", (p) => (p.discount_percent ? p.discount_percent + "% off" : "")],
-      ["Availability", (p) => (p.in_stock ? `In stock (${p.stock})` : "Out of stock")],
+      ["Availability", (p) => (p.in_stock ? `In stock (${p.stock})` : stockText(p))],
       ["Brand", (p) => esc(p.brand)], ["Category", (p) => esc(p.category_name)], ["SKU", (p) => esc(p.sku)],
       ["Material", (p) => esc(p.material)], ["Size", (p) => esc(p.size)], ["Colour", (p) => esc(p.color)],
       ["Weight", (p) => esc(p.weight)], ["Finish", (p) => esc(p.finish)], ["Thickness", (p) => esc(p.thickness)],
@@ -531,7 +531,7 @@ async function initProductDetails() {
 
         <div class="pd-price">
           <div class="price-row">
-            <span class="price">${money(p.final_price)}</span>
+            <span class="price">${priceText(p)}</span>
             ${p.discount_percent ? `<span class="badge badge-sale">${p.discount_percent}% OFF</span>` : ""}
             <span class="price-unit">per ${esc(p.unit || "piece")}</span>
           </div>
@@ -606,7 +606,7 @@ async function initProductDetails() {
 
     <div class="sticky-buy">
       <button class="btn btn-outline" onclick="addToCart(pdState.product, pdState.qty)" ${p.in_stock ? "" : "disabled"}>${icon("cart")} Add</button>
-      <button class="btn btn-primary" onclick="pdBuyNow()" ${p.in_stock ? "" : "disabled"}>Buy now · ${money(p.final_price)}</button>
+      <button class="btn btn-primary" onclick="pdBuyNow()" ${p.in_stock ? "" : "disabled"}>Buy now · ${priceText(p)}</button>
     </div>`;
 
   bindQty(p);
@@ -760,7 +760,7 @@ function whatsappProduct(id) {
   const text =
     `Hello, I am interested in this product:\n\n*${p.name}*\n` +
     (p.sku ? `SKU: ${p.sku}\n` : "") +
-    `Price: ${money(p.final_price)} / ${p.unit || "piece"}\n` +
+    `Price: ${priceText(p)} / ${p.unit || "piece"}\n` +
     `${location.origin}${productUrl(p)}\n\nPlease share availability and details.`;
   window.open(waLink(text), "_blank", "noopener");
 }

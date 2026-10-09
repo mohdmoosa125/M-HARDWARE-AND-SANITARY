@@ -43,7 +43,7 @@ async function loadHeroCollage() {
       window.__productCache[p.id] = p;
       return `<a class="hero-tile" href="${productUrl(p)}">
         <img src="${imgSrc(p.image)}" alt="${esc(p.name)}" onerror="this.src=PLACEHOLDER">
-        <div><b>${esc(p.name)}</b>${money(p.final_price)}</div></a>`;
+        <div><b>${esc(p.name)}</b>${priceText(p)}</div></a>`;
     }).join("");
   } catch {
     host.remove();

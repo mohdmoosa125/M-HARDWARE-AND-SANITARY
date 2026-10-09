@@ -1,0 +1,89 @@
+id,name,category,price,price_source,primary_image,gallery_images,original_files,match_confidence,note
+1,Premium PVC Pipe 1 inch,PVC Pipes,120.0,existing,/uploads/products/9d92ed59a724_images_2.jpeg,,,none,no usable photo in folder
+2,CPVC Hot Water Pipe 3/4 inch,CPVC Pipes,210.0,existing,/uploads/products/fdcf23a9e817_plasto_pipe.jpeg,,,none,no usable photo in folder
+3,UPVC Drainage Pipe 4 inch,UPVC Pipes,480.0,existing,/uploads/products/f75490a8522a_images_1.jpeg,,,none,no usable photo in folder
+4,Wall Mounted Wash Basin,Wash Basin,2254.0,existing,/uploads/products/eef8c73fc12b_images_20.jpeg,,,medium,kept your uploaded photo
+5,One Piece Western Toilet,Toilet,8900.0,existing,/uploads/products/one-piece-western-toilet.webp,,266.jpg,high,new primary photo
+6,Chrome Bathroom Shower Set,Shower,1488.0,existing,/uploads/products/chrome-bathroom-shower-set.webp,,204.jpg,medium,new primary photo
+7,Brass Water Tap,Taps,563.0,existing,/uploads/products/d68faabcdbca_images_5.jpeg,,,none,no usable photo in folder
+8,Pillar Cock Tap,Taps,468.0,existing,/uploads/products/5570731007dd_images_34.jpeg,,124.jpg,medium,kept your uploaded photo
+9,Designer Floor Tile 600x600,Floor Tiles,702.0,existing,/uploads/products/504f2fd8547f_images_60.jpeg,,153.jpg,medium,kept your uploaded photo
+10,Glossy Wall Tile 300x600,Wall Tiles,520.0,existing,/uploads/products/0ba6c0d36fd8_images_57.jpeg,,,none,no usable photo in folder
+11,Anti Skid Bathroom Tile,Bathroom Tiles,610.0,existing,/uploads/products/6853b4acc96d_images_54.jpeg,,,none,no usable photo in folder
+12,PVC Elbow 1 inch,Elbow,18.0,existing,/uploads/products/3dea84b7603d_images_45.jpeg,,226.jpg,medium,kept your uploaded photo
+13,PVC Tee 1 inch,Tee,24.0,existing,/uploads/products/48b78499f761_images_52.jpeg,,5.jpg,medium,kept your uploaded photo
+14,Pipe Coupler 3/4 inch,Coupler,15.0,existing,/uploads/products/pipe-coupler-34-inch.svg,,,none,no usable photo in folder (still fallback)
+15,Drilling Machine 13mm,Drilling Machines,2752.0,existing,/uploads/products/drilling-machine-13mm.svg,,,none,no usable photo in folder (still fallback)
+16,Angle Grinder 4 inch,Grinding Machines,2750.0,existing,/uploads/products/angle-grinder-4-inch.svg,,,none,no usable photo in folder (still fallback)
+17,Cutting Machine 14 inch,Cutting Machines,5600.0,existing,/uploads/products/d4994a83a078_images_43.jpeg,,,none,no usable photo in folder
+18,Steel Claw Hammer,Tools,288.0,existing,/uploads/products/steel-claw-hammer.svg,,,none,no usable photo in folder (still fallback)
+19,Adjustable Wrench 10 inch,Tools,396.0,existing,/uploads/products/adjustable-wrench-10-inch.webp,,75.jpg,medium,new primary photo
+20,Screwdriver Set (6 pcs),Tools,390.0,existing,/uploads/products/screwdriver-set-6-pcs.svg,,,none,no usable photo in folder (still fallback)
+21,Cement Bag 50 kg,Construction Materials,410.0,existing,/uploads/products/2825697554ae_images_61.jpeg,,,medium,kept your uploaded photo
+22,River Sand (per cubic ft),Construction Materials,55.0,existing,/uploads/products/river-sand-per-cubic-ft.svg,,,none,no usable photo in folder (still fallback)
+23,Stainless Steel Door Hinge,Hinges,85.0,existing,/uploads/products/stainless-steel-door-hinge.svg,,,none,no usable photo in folder (still fallback)
+24,Brass Door Lock,Locks,1138.0,existing,/uploads/products/brass-door-lock.svg,,,none,no usable photo in folder (still fallback)
+25,Wood Screw 1 inch (100 pcs),Screws,110.0,existing,/uploads/products/wood-screw-1-inch-100-pcs.webp,,44.jpg,medium,new primary photo
+26,Table Top Wash Basin,Wash Basin,2850.0,existing,/uploads/products/table-top-wash-basin.webp,,108.jpg,high,new primary photo
+27,Corner Wash Basin,Wash Basin,1950.0,existing,/uploads/products/corner-wash-basin.svg,,,none,no usable photo in folder (still fallback)
+28,Wall Hung Western Toilet,Toilet,7400.0,existing,/uploads/products/wall-hung-western-toilet.svg,,,none,no usable photo in folder (still fallback)
+29,Indian Toilet Pan 22 inch,Toilet,1150.0,existing,/uploads/products/indian-toilet-pan-22-inch.svg,,,none,no usable photo in folder (still fallback)
+30,Toilet Seat Cover,Toilet,480.0,existing,/uploads/products/toilet-seat-cover.svg,,,none,no usable photo in folder (still fallback)
+31,Flush Cistern 10 Litre,Cistern & Urinal,1850.0,existing,/uploads/products/flush-cistern-10-litre.svg,,,none,no usable photo in folder (still fallback)
+32,Wall Mounted Urinal,Cistern & Urinal,1350.0,existing,/uploads/products/wall-mounted-urinal.svg,,,none,no usable photo in folder (still fallback)
+33,Health Faucet with Hose,Bathroom Accessories,520.0,existing,/uploads/products/health-faucet-with-hose.webp,,94.jpg,high,new primary photo
+34,Bathroom Mirror 18x24 inch,Mirrors,950.0,existing,/uploads/products/bathroom-mirror-18x24-inch.svg,,,none,no usable photo in folder (still fallback)
+35,Stainless Steel Floor Drain,Drains,260.0,existing,/uploads/products/stainless-steel-floor-drain.webp,,55.jpg,medium,new primary photo
+36,Towel Rod 24 inch,Bathroom Accessories,420.0,existing,/uploads/products/towel-rod-24-inch.svg,,,none,no usable photo in folder (still fallback)
+37,Bib Cock Tap,Taps,340.0,existing,/uploads/products/bib-cock-tap.webp,,213.jpg,high,new primary photo
+38,Angle Cock Chrome,Taps,290.0,existing,/uploads/products/angle-cock-chrome.svg,,,none,no usable photo in folder (still fallback)
+39,Swan Neck Tap,Taps,804.0,existing,/uploads/products/897ce397063a_images_72.jpeg,,168.jpg,medium,kept your uploaded photo
+40,Basin Mixer Tap,Taps,1290.0,existing,/uploads/products/bbe4364cb96b_images_73.jpeg,,172.jpg,medium,kept your uploaded photo
+41,Wall Mixer with Spout,Taps,2350.0,existing,/uploads/products/a7dfbd2feb50_wall-mount-installation-type-2-in-1-wall-mixer-for-bathroom-original-imahdnkmtekb4j9y.webp,,50.jpg,medium,kept your uploaded photo
+42,Shower Mixer Single Lever,Shower,2100.0,existing,/uploads/products/81800e475c45_images_87.jpeg,,77.jpg,medium,kept your uploaded photo
+43,Hand Shower with Hose,Shower,680.0,existing,/uploads/products/b4ccf212a6e6_images_88.jpeg,,57.jpg,medium,kept your uploaded photo
+44,Overhead Shower 8 inch,Shower,1162.0,existing,/uploads/products/d8c71744da1a_images_89.jpeg,,,medium,kept your uploaded photo
+45,Kitchen Sink Tap,Taps,760.0,existing,/uploads/products/5a8b4d3552bb_images_28.jpeg,,3.jpg,medium,kept your uploaded photo
+46,PVC Pipe 1.5 inch,PVC Pipes,190.0,existing,/uploads/products/1ff9c208a087_images_4.jpeg,,,none,no usable photo in folder
+47,PVC Pipe 2 inch,PVC Pipes,260.0,existing,/uploads/products/6849b3309810_images_2.jpeg,,70.jpg,medium,kept your uploaded photo
+48,PVC Pipe 4 inch,PVC Pipes,520.0,existing,/uploads/products/dc2721fba6f2_images_1.jpeg,,228.jpg,medium,kept your uploaded photo
+49,CPVC Pipe 1 inch,CPVC Pipes,340.0,existing,/uploads/products/cpvc-pipe-1-inch.svg,,,none,no usable photo in folder (still fallback)
+50,SWR Drainage Pipe 3 inch,Drainage Pipes,390.0,existing,/uploads/products/swr-drainage-pipe-3-inch.svg,,,none,no usable photo in folder (still fallback)
+51,Water Tank Pipe 1.25 inch,Water Pipes,230.0,existing,/uploads/products/water-tank-pipe-125-inch.svg,,,none,no usable photo in folder (still fallback)
+52,PVC Union 1 inch,Union,65.0,existing,/uploads/products/pvc-union-1-inch.webp,,7.jpg,high,new primary photo
+53,PVC Reducer 2 to 1 inch,Reducer,38.0,existing,/uploads/products/pvc-reducer-2-to-1-inch.webp,,71.jpg,medium,new primary photo
+54,Brass Nipple 1/2 inch,Brass Fittings,75.0,existing,/uploads/products/brass-nipple-12-inch.svg,,,none,no usable photo in folder (still fallback)
+55,Brass Ball Valve 3/4 inch,Brass Fittings,310.0,existing,/uploads/products/brass-ball-valve-34-inch.svg,,,none,no usable photo in folder (still fallback)
+56,pvc Elbow 1 inch,GI Fittings,55.0,existing,/uploads/products/aeaed9f4004d_images_45.jpeg,,86.jpg,medium,kept your uploaded photo
+57,GI Tee 1 inch,GI Fittings,68.0,existing,/uploads/products/0ad666df5dc7_images_100.jpeg,,,none,no usable photo in folder
+58,Pipe Clamp 1 inch (10 pcs),Brackets & Clamps,90.0,existing,/uploads/products/a063e81d0dc6_images_91.jpeg,,252.jpg,medium,kept your uploaded photo
+59,Wood Screw 2 inch (100 pcs),Screws,150.0,existing,/uploads/products/91e301eeb0ff_images_99.jpeg,,,none,no usable photo in folder
+60,Wood Screw 3 inch (50 pcs),Screws,170.0,existing,/uploads/products/444d44bc0d99_images_99.jpeg,,,none,no usable photo in folder
+61,Wire Nails 2 inch (1 kg),Nails,85.0,existing,/uploads/products/df1bdb239cad_images_98.jpeg,,19.jpg,medium,kept your uploaded photo
+62,Bolt Nut Washer Set (50 pcs),Bolts & Nuts,210.0,existing,/uploads/products/0cf4d1ece900_images_97.jpeg,,263.jpg,medium,kept your uploaded photo
+63,Door Hinge 6 inch,Hinges,140.0,existing,/uploads/products/4b4e7e37e5f6_images_96.jpeg,,,none,no usable photo in folder
+64,Brass Door Handle Pair,Handles & Latches,780.0,existing,/uploads/products/94a3f87c9b96_images_95.jpeg,,,medium,kept your uploaded photo
+65,Mortice Lock with Keys,Locks,1650.0,existing,/uploads/products/6eb1f0cba54a_images_94.jpeg,,,medium,kept your uploaded photo
+66,Tower Bolt Latch 8 inch,Handles & Latches,120.0,existing,/uploads/products/45c98571d018_images_93.jpeg,,,medium,kept your uploaded photo
+67,Shelf Bracket 10 inch,Brackets & Clamps,95.0,existing,/uploads/products/1dac045fe408_images_92.jpeg,,,medium,kept your uploaded photo
+68,U Clamp 2 inch (10 pcs),Brackets & Clamps,110.0,existing,/uploads/products/38ffd9f07569_images_91.jpeg,,,medium,kept your uploaded photo
+69,Floor Tile 600x600 Glossy Grey,Floor Tiles,820.0,existing,/uploads/products/1ec0ac5a20c7_images_55.jpeg,,,none,no usable photo in folder
+70,Anti Skid Floor Tile 600x600,Floor Tiles,690.0,existing,/uploads/products/523d2abf15cf_images_90.jpeg,,,none,no usable photo in folder
+71,Kitchen Wall Tile 300x450,Kitchen Tiles,480.0,existing,/uploads/products/ed8fc3c3ed65_images_56.jpeg,,,none,no usable photo in folder
+72,Designer Wall Tile 300x600,Designer Tiles,640.0,existing,/uploads/products/6f55f42be274_images_86.jpeg,,,medium,kept your uploaded photo
+73,Marble Finish Floor Tile 800x800,Marble Finish,1218.0,existing,/uploads/products/aa0c14732866_images_85.jpeg,,240.jpg,medium,kept your uploaded photo
+74,Granite Finish Floor Tile 600x600,Granite Finish,960.0,existing,/uploads/products/d6895ccf2747_images_83.jpeg,,148.jpg,medium,kept your uploaded photo
+75,Combination Plier 8 inch,Tools,280.0,existing,/uploads/products/95ccaf7233bd_images_81.jpeg,,,medium,kept your uploaded photo
+76,Pipe Wrench 14 inch,Tools,720.0,existing,/uploads/products/b4e4a9d0e009_images_80.jpeg,,,none,no usable photo in folder
+77,Measuring Tape 5 m,Tools,160.0,existing,/uploads/products/d283484f6188_images_79.jpeg,,,none,no usable photo in folder
+78,Spanner Set 12 pcs,Tools,712.0,existing,/uploads/products/db4686db7a33_images_71.jpeg,,,medium,kept your uploaded photo
+79,Plastic Tool Box 16 inch,Tools,540.0,existing,/uploads/products/f4d05bdb4822_images_70.jpeg,,,none,no usable photo in folder
+80,Hacksaw Frame with Blade,Tools,230.0,existing,/uploads/products/222ab2d9dad8_images_69.jpeg,,,medium,kept your uploaded photo
+81,Welding Machine 200A,Welding Machines,8900.0,existing,/uploads/products/5d41c50f17af_images_68.jpeg,,18.jpg,medium,kept your uploaded photo
+82,Water Pump 1 HP,Pumps,4698.0,existing,/uploads/products/2f8e0131ecb8_images_67.jpeg,,,medium,kept your uploaded photo
+83,Pressure Pump 0.5 HP,Pumps,3900.0,existing,/uploads/products/ddb59a3599c3_images_66.jpeg,,,none,no usable photo in folder
+84,Tile Adhesive 20 kg,Construction Materials,520.0,existing,/uploads/products/545493f410bb_images_65.jpeg,,,none,no usable photo in folder
+85,Waterproofing Compound 5 L,Construction Materials,680.0,existing,/uploads/products/68d791463658_images_64.jpeg,,,none,no usable photo in folder
+86,Binding Wire 1 kg,Construction Materials,95.0,existing,/uploads/products/7b94a518fbb9_images_63.jpeg,,,medium,kept your uploaded photo
+87,PTFE Thread Seal Tape,Accessories,25.0,existing,/uploads/products/caf699ab8e04_images_62.jpeg,,,none,no usable photo in folder
+88,PVC Solvent Cement 100 ml,Accessories,100.0,existing,/uploads/products/b7ed0ed00e6e_118-cpvc-solvent-adhesive-118-ml-plasto-original-imagw6qhyay5ehbu.webp,,373.jpg,medium,kept your uploaded photo
