@@ -10,8 +10,26 @@ window.__settings = {};
 window.__me = null;              // logged-in customer (or null)
 window.__wishlist = new Set();   // product ids in the customer's wishlist
 
+/* ---------- static-hosting fallback (no backend, e.g. Netlify) ---------- */
+let __staticMode = false;
+let __staticLoader = null;
+function staticRequest(path, options) {
+  __staticMode = true;
+  if (!__staticLoader) {
+    __staticLoader = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "/js/static-api.js";
+      s.onload = resolve;
+      s.onerror = () => { __staticLoader = null; reject(new Error("Unable to load the catalogue. Please try again.")); };
+      document.head.appendChild(s);
+    });
+  }
+  return __staticLoader.then(() => staticApi(path, options));
+}
+
 /* ---------- fetch wrapper ---------- */
 async function api(path, options = {}) {
+  if (__staticMode) return staticRequest(path, options);
   let res;
   try {
     res = await fetch(API_BASE + path, {
@@ -20,12 +38,14 @@ async function api(path, options = {}) {
       ...options,
     });
   } catch {
-    throw new Error("Network problem. Please check your connection and try again.");
+    return staticRequest(path, options);
   }
   let data;
   try {
     data = await res.json();
   } catch {
+    // An HTML/non-JSON reply means there is no API here — serve the exported catalogue.
+    if (!(res.headers.get("content-type") || "").includes("json")) return staticRequest(path, options);
     data = { success: false, message: "Something went wrong. Please try again." };
   }
   if (!res.ok || data.success === false) {
