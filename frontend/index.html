@@ -14,7 +14,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { corePlugins: { preflight: false } };</script>
 
@@ -30,14 +30,18 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div>
-          <span class="hero-tag">Hardware · Sanitary · Plumbing · Tiles — Bhopal</span>
-          <h1>Quality Hardware &amp; Sanitary Solutions <em>For Every Home &amp; Project</em></h1>
-          <p class="hero-text">Trusted products, expert guidance and reliable service in Bhopal.</p>
+          <span class="hero-tag">Bhopal's hardware &amp; sanitary store</span>
+          <h1>Renovate with confidence. <em>Get it right the first time.</em></h1>
+          <p class="hero-text">Taps, tiles, basins, pipes and tools for your home in one place. Send us your list on WhatsApp and get prices and stock confirmed by our team.</p>
           <div class="hero-buttons">
-            <a class="btn btn-accent btn-lg" href="/products.html">Shop Products</a>
-            <a class="btn btn-outline-light btn-lg" href="/categories.html">Explore Categories</a>
-            <a class="btn btn-outline-light btn-lg" href="/contact.html">Contact Us</a>
+            <a class="btn btn-whatsapp btn-lg" data-whatsapp="Hello, I'd like a quote for my renovation. Here is my list:" href="/contact.html"><span data-icon="whatsapp"></span> Get a quote on WhatsApp</a>
+            <a class="btn btn-outline-light btn-lg" href="/products.html">Browse products</a>
           </div>
+          <ul class="hero-points">
+            <li><span data-icon="check"></span> Clear prices, shown upfront</li>
+            <li><span data-icon="check"></span> Store pickup in Bhopal</li>
+            <li><span data-icon="check"></span> Advice from people who know plumbing</li>
+          </ul>
         </div>
         <div class="hero-collage" id="heroCollage" aria-label="Featured products"></div>
       </div>
@@ -59,6 +63,16 @@
         <a href="/products.html?featured=1" class="link-more">View all →</a>
       </div>
       <div id="featuredProducts" class="product-grid cols-4"></div>
+    </section>
+
+    <section class="section how" style="padding-top:0" aria-labelledby="howTitle">
+      <div class="section-head"><div><span class="eyebrow">How it works</span><h2 id="howTitle">Your renovation list, sorted in 3 steps</h2></div></div>
+      <ol class="steps">
+        <li><span class="step-no">1</span><h3>Send your list</h3><p>WhatsApp us a photo, a sketch or a typed list. Nothing is too small.</p></li>
+        <li><span class="step-no">2</span><h3>Get prices &amp; stock</h3><p>We confirm what's available, suggest the right fittings, and send a clear quote.</p></li>
+        <li><span class="step-no">3</span><h3>Pick up or get it delivered</h3><p>Collect from our Bhopal store or ask for delivery. Pay at the store or on delivery.</p></li>
+      </ol>
+      <div class="how-cta"><a class="btn btn-whatsapp btn-lg" data-whatsapp="Hello, I'd like a quote. Here is my list:" href="/contact.html"><span data-icon="whatsapp"></span> Start on WhatsApp</a><a class="btn btn-outline btn-lg" data-phone-link href="/contact.html"><span data-icon="phone"></span> Call the store</a></div>
     </section>
 
     <section class="section" style="padding-top:0">
