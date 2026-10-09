@@ -11,7 +11,27 @@ async function initHome() {
     loadProductStrip("featuredProducts", "?featured=1&sort=featured&limit=8"),
     loadProductStrip("dealProducts", "?discount=1&sort=discount&limit=4"),
     loadProductStrip("latestProducts", "?sort=newest&limit=4"),
+    loadStats(),
   ]);
+}
+
+/* Real counts from the catalogue — never hard-coded marketing numbers. */
+async function loadStats() {
+  const host = document.getElementById("statsBand");
+  if (!host) return;
+  try {
+    const [prods, filters] = await Promise.all([api("/products?limit=1"), api("/products/filters")]);
+    const stats = [
+      [prods.meta?.total, "Products listed"],
+      [(filters.data?.categories || []).length, "Categories"],
+      [(filters.data?.brands || []).length, "Brands"],
+    ].filter(([n]) => n > 0);
+    host.innerHTML = stats.map(([n, label]) =>
+      `<div class="stat"><b data-count="${n}">${Number(n).toLocaleString("en-IN")}</b><span>${label}</span></div>`).join("") +
+      `<div class="stat"><b>${esc(window.__settings.city || "Bhopal")}</b><span>Local store &amp; pickup</span></div>`;
+  } catch {
+    host.remove();
+  }
 }
 
 function renderTrustRow() {
